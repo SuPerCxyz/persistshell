@@ -8,7 +8,23 @@
 
 ## 当前仓库状态
 
-当前阶段只建立文档体系，没有写入任何业务代码、构建脚本或测试代码。
+当前阶段已经建立文档体系和 Rust 工程骨架。
+
+已存在：
+
+- Cargo workspace。
+- `persist` CLI 骨架。
+- `persistd` daemon 骨架。
+- `persist-core`、`persist-pty`、`persist-ipc`、`persist-metadata` crate 边界。
+- GitHub Actions CI 和 package workflow。
+
+尚未实现：
+
+- PTY Engine。
+- daemon runtime。
+- IPC streaming。
+- metadata database。
+- SSH 自动接管和安装器。
 
 ## 后续 Agent 启动顺序
 

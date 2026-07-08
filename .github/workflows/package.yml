@@ -1,0 +1,58 @@
+name: Package
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux-tarball:
+    name: Linux tarball
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Build release binaries
+        run: cargo build --release --workspace --locked
+
+      - name: Create package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+          target_triple="x86_64-unknown-linux-gnu"
+          package_name="persistshell-v${version}-${target_triple}"
+
+          mkdir -p "dist/${package_name}/bin" "dist/${package_name}/docs"
+          cp target/release/persist "dist/${package_name}/bin/"
+          cp target/release/persistd "dist/${package_name}/bin/"
+          cp README.md LICENSE CHANGELOG.md "dist/${package_name}/"
+          cp docs/INDEX.md "dist/${package_name}/docs/"
+          cp -R docs/user "dist/${package_name}/docs/user"
+
+          tar -czf "dist/${package_name}.tar.gz" -C dist "${package_name}"
+          (cd dist && sha256sum "${package_name}.tar.gz" > "${package_name}.tar.gz.sha256")
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: persistshell-linux-tarball
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
+

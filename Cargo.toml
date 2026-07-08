@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "crates/persist-cli",
+    "crates/persist-core",
+    "crates/persist-ipc",
+    "crates/persist-metadata",
+    "crates/persist-pty",
+    "crates/persistd",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+authors = ["PersistShell contributors"]
+repository = "https://github.com/SuPerCxyz/persistshell"
+license-file = "LICENSE"
+

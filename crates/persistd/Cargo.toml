@@ -1,0 +1,17 @@
+[package]
+name = "persistd"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+license-file.workspace = true
+publish = false
+
+[[bin]]
+name = "persistd"
+path = "src/main.rs"
+
+[dependencies]
+persist-core = { path = "../persist-core" }
+

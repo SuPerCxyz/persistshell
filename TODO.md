@@ -22,45 +22,45 @@
 
 ### 文档体系
 
-- [ ] 创建 README.md
-- [ ] 创建 PROJECT_PRINCIPLES.md
-- [ ] 创建 PRODUCT_PHILOSOPHY.md
-- [ ] 创建 NON_GOALS.md
-- [ ] 创建 ROADMAP.md
-- [ ] 创建 MILESTONES.md
-- [ ] 创建 NEXT_TASK.md
-- [ ] 创建 TODO.md
-- [ ] 创建 CHANGELOG.md
-- [ ] 创建 CONTRIBUTING.md
-- [ ] 创建 SECURITY.md
-- [ ] 创建 SUPPORT.md
-- [ ] 创建 CODE_OF_CONDUCT.md
-- [ ] 创建 ADR 模板
-- [ ] 创建 docs 目录结构
-- [ ] 创建 architecture 文档
-- [ ] 创建 development 文档
-- [ ] 创建 protocol 文档
-- [ ] 创建 benchmark 文档
-- [ ] 创建 user 文档
-- [ ] 创建 known 文档
+- [x] 创建 README.md
+- [x] 创建 PROJECT_PRINCIPLES.md
+- [x] 创建 PRODUCT_PHILOSOPHY.md
+- [x] 创建 NON_GOALS.md
+- [x] 创建 ROADMAP.md
+- [x] 创建 MILESTONES.md
+- [x] 创建 NEXT_TASK.md
+- [x] 创建 TODO.md
+- [x] 创建 CHANGELOG.md
+- [x] 创建 CONTRIBUTING.md
+- [x] 创建 SECURITY.md
+- [x] 创建 SUPPORT.md
+- [x] 创建 CODE_OF_CONDUCT.md
+- [x] 创建 ADR 模板
+- [x] 创建 docs 目录结构
+- [x] 创建 architecture 文档
+- [x] 创建 development 文档
+- [x] 创建 protocol 文档
+- [x] 创建 benchmark 文档
+- [x] 创建 user 文档
+- [x] 创建 known 文档
 
 ### 工程初始化
 
 - [x] 选择主要开发语言：Rust
-- [ ] 初始化 Cargo workspace
-- [ ] 确定 Rust MSRV
-- [ ] 初始化构建系统
-- [ ] 初始化测试框架
-- [ ] 初始化 GitHub Actions CI
-- [ ] 初始化 GitHub Actions package workflow
-- [ ] 初始化 rustfmt
-- [ ] 初始化 clippy
-- [ ] 初始化目录结构
-- [ ] 创建最小 CLI 骨架
-- [ ] 创建版本命令
-- [ ] 创建基础错误处理框架
-- [ ] 创建基础配置加载框架
-- [ ] 创建内部日志框架
+- [x] 初始化 Cargo workspace
+- [x] 确定 Rust MSRV
+- [x] 初始化构建系统
+- [x] 初始化测试框架
+- [x] 初始化 GitHub Actions CI
+- [x] 初始化 GitHub Actions package workflow
+- [x] 初始化 rustfmt
+- [x] 初始化 clippy
+- [x] 初始化目录结构
+- [x] 创建最小 CLI 骨架
+- [x] 创建版本命令
+- [x] 创建基础错误处理框架
+- [x] 创建基础配置加载框架
+- [x] 创建内部日志框架
 
 ---
 

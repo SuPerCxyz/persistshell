@@ -10,6 +10,9 @@
 
 ### Added
 
+- 初始化 Rust Cargo workspace，新增 `persist` CLI、`persistd` daemon 骨架和 core/pty/ipc/metadata crate 边界。
+- 添加 Rust fmt、clippy、test 验证，以及 GitHub Actions CI/package workflow。
+- 添加基础错误、配置路径、日志初始化和 Session 状态模型。
 - 添加 GitHub Actions CI 与发布包构建要求，记录 GitHub 镜像仓库 `https://github.com/SuPerCxyz/persistshell`。
 - 初始化 PersistShell 项目文档体系。
 - 添加 README.md。
@@ -29,6 +32,7 @@
 
 ### Changed
 
+- 将 M00/M01 标记完成，下一任务更新为 M02 基础配置系统。
 - 确定 PersistShell 主开发语言为 Rust，并同步 Agent 规则、开发规范和目录结构文档。
 - 调整 Session 退出语义：`exit`/`Ctrl-D` 进入 Closed 状态，释放 shell runtime，但保留可恢复的输出、cwd、环境变量快照和 metadata。
 - 明确另一台电脑可以 attach 到已有 Session 并获取可写操作权；只读 attach 只是可选模式，不是跨电脑进入会话的唯一方式。
