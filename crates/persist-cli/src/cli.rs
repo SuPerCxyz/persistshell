@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 
 use persist_core::{
-    init_logging, load_config, load_default_config, version_string, Config, ConfigLoadOptions,
+    init_logging, load_config, log_message, version_string, Config, ConfigLoadOptions, LogLevel,
     LoggerConfig, PersistError,
 };
 
@@ -24,13 +24,8 @@ where
     W: Write,
     E: Write,
 {
-    if let Err(error) = init_logging(LoggerConfig::default()) {
-        let _ = writeln!(stderr, "failed to initialize logging: {error}");
-        return 1;
-    }
-
     let args = args.into_iter().skip(1).collect::<Vec<_>>();
-    match parse_command(&args).and_then(|command| execute(command, stdout)) {
+    match parse_command(&args).and_then(|command| execute_with_optional_config(command, stdout)) {
         Ok(()) => 0,
         Err(error) => {
             let _ = writeln!(stderr, "persist: {error}");
@@ -39,7 +34,45 @@ where
     }
 }
 
-fn execute<W: Write>(command: Command, stdout: &mut W) -> Result<(), PersistError> {
+fn execute_with_optional_config<W: Write>(
+    command: Command,
+    stdout: &mut W,
+) -> Result<(), PersistError> {
+    if command_uses_config(&command) {
+        let options = ConfigLoadOptions::from_environment()?;
+        let config = load_config(&options)?;
+        init_logging(config.internal_log.client_logger_config())?;
+        log_message(LogLevel::Info, "client", command_log_message(&command))?;
+        execute(command, stdout, Some((&options, &config)))
+    } else {
+        init_logging(LoggerConfig::disabled())?;
+        execute(command, stdout, None)
+    }
+}
+
+fn command_uses_config(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::Doctor | Command::Config | Command::Daemon { .. } | Command::Planned { .. }
+    )
+}
+
+fn command_log_message(command: &Command) -> &'static str {
+    match command {
+        Command::Help => "command=help started",
+        Command::Version => "command=version started",
+        Command::Doctor => "command=doctor started",
+        Command::Config => "command=config started",
+        Command::Daemon { .. } => "command=daemon started",
+        Command::Planned { .. } => "command=planned started",
+    }
+}
+
+fn execute<W: Write>(
+    command: Command,
+    stdout: &mut W,
+    loaded_config: Option<(&ConfigLoadOptions, &Config)>,
+) -> Result<(), PersistError> {
     match command {
         Command::Help => write_help(stdout),
         Command::Version => {
@@ -48,8 +81,8 @@ fn execute<W: Write>(command: Command, stdout: &mut W) -> Result<(), PersistErro
                 source,
             })
         }
-        Command::Doctor => write_doctor(stdout),
-        Command::Config => write_config(stdout),
+        Command::Doctor => write_doctor(stdout, loaded_config.map(|(_, config)| config)),
+        Command::Config => write_config(stdout, loaded_config),
         Command::Daemon { action } => Err(PersistError::not_implemented(match action.as_deref() {
             Some("start") => "persist daemon start",
             Some("stop") => "persist daemon stop",
@@ -99,10 +132,17 @@ Planned commands:
     })
 }
 
-fn write_config<W: Write>(stdout: &mut W) -> Result<(), PersistError> {
-    let options = ConfigLoadOptions::from_environment()?;
-    let config = load_config(&options)?;
-    write_config_values(stdout, &options, &config)
+fn write_config<W: Write>(
+    stdout: &mut W,
+    loaded_config: Option<(&ConfigLoadOptions, &Config)>,
+) -> Result<(), PersistError> {
+    if let Some((options, config)) = loaded_config {
+        write_config_values(stdout, options, config)
+    } else {
+        let options = ConfigLoadOptions::from_environment()?;
+        let config = load_config(&options)?;
+        write_config_values(stdout, &options, &config)
+    }
 }
 
 fn write_config_values<W: Write>(
@@ -129,6 +169,7 @@ fn write_config_values_inner<W: Write>(
     write_session_config(stdout, config)?;
     write_ring_buffer_config(stdout, config)?;
     write_logging_config(stdout, config)?;
+    write_internal_log_config(stdout, config)?;
     write_security_config(stdout, config)?;
     write_ssh_config(stdout, config)
 }
@@ -237,6 +278,30 @@ fn write_logging_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result
     )
 }
 
+fn write_internal_log_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(stdout, "internal_log.level: {}", config.internal_log.level)?;
+    writeln!(
+        stdout,
+        "internal_log.daemon_log: {}",
+        config.internal_log.daemon_log.display()
+    )?;
+    writeln!(
+        stdout,
+        "internal_log.client_log: {}",
+        config.internal_log.client_log.display()
+    )?;
+    writeln!(
+        stdout,
+        "internal_log.max_file_size: {}",
+        config.internal_log.max_file_size
+    )?;
+    writeln!(
+        stdout,
+        "internal_log.max_files: {}",
+        config.internal_log.max_files
+    )
+}
+
 fn write_security_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
     writeln!(
         stdout,
@@ -255,10 +320,21 @@ fn write_ssh_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()>
     writeln!(stdout, "ssh.bypass_env: {}", config.ssh.bypass_env)
 }
 
-fn write_doctor<W: Write>(stdout: &mut W) -> Result<(), PersistError> {
-    let config = load_default_config()?;
+fn write_doctor<W: Write>(
+    stdout: &mut W,
+    loaded_config: Option<&Config>,
+) -> Result<(), PersistError> {
+    let fallback_config;
+    let config = if let Some(config) = loaded_config {
+        config
+    } else {
+        fallback_config = persist_core::load_default_config()?;
+        &fallback_config
+    };
+
     writeln!(stdout, "PersistShell doctor")
         .and_then(|_| writeln!(stdout, "status: engineering skeleton"))
+        .and_then(|_| writeln!(stdout, "config: valid"))
         .and_then(|_| writeln!(stdout, "config_dir: {}", config.paths.config_dir.display()))
         .and_then(|_| writeln!(stdout, "data_dir: {}", config.paths.data_dir.display()))
         .and_then(|_| writeln!(stdout, "state_dir: {}", config.paths.state_dir.display()))
@@ -270,6 +346,13 @@ fn write_doctor<W: Write>(stdout: &mut W) -> Result<(), PersistError> {
             )
         })
         .and_then(|_| writeln!(stdout, "socket: {}", config.paths.socket_path.display()))
+        .and_then(|_| {
+            writeln!(
+                stdout,
+                "client_log: {}",
+                config.internal_log.client_log.display()
+            )
+        })
         .map_err(|source| PersistError::Io {
             operation: "write doctor output",
             source,
@@ -334,6 +417,7 @@ mod tests {
         let output = String::from_utf8(out).expect("utf8");
         assert!(output.contains("daemon.auto_start: true"));
         assert!(output.contains("ring_buffer.default_size: 8MB"));
+        assert!(output.contains("internal_log.level: info"));
         assert!(output.contains("ssh.bypass_env: PERSIST_DISABLE"));
     }
 }

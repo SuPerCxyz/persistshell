@@ -12,5 +12,7 @@ pub use config::{
     DurationValue,
 };
 pub use error::{PersistError, Result};
-pub use logging::{init_logging, LogLevel, LoggerConfig};
+pub use logging::{
+    flush_logging, init_logging, log_message, LogDestination, LogLevel, LoggerConfig,
+};
 pub use session::{AttachMode, SessionStatus};

@@ -11,8 +11,8 @@ use crate::error::{PersistError, Result};
 
 use sections::PartialConfig;
 pub use sections::{
-    DaemonConfig, LoggingConfig, RingBufferConfig, RuntimeConfig, SecurityConfig, SessionConfig,
-    SshConfig,
+    DaemonConfig, InternalLogConfig, LoggingConfig, RingBufferConfig, RuntimeConfig,
+    SecurityConfig, SessionConfig, SshConfig,
 };
 pub use values::{ByteSize, DurationValue};
 
@@ -120,12 +120,14 @@ pub struct Config {
     pub session: SessionConfig,
     pub ring_buffer: RingBufferConfig,
     pub logging: LoggingConfig,
+    pub internal_log: InternalLogConfig,
     pub security: SecurityConfig,
     pub ssh: SshConfig,
 }
 
 impl Config {
     pub fn default_with_paths(paths: ConfigPaths) -> Self {
+        let internal_log = InternalLogConfig::default_with_state_dir(&paths.state_dir);
         Self {
             runtime: RuntimeConfig {
                 socket_dir: paths.runtime_dir.clone(),
@@ -135,6 +137,7 @@ impl Config {
             session: SessionConfig::default(),
             ring_buffer: RingBufferConfig::default(),
             logging: LoggingConfig::default(),
+            internal_log,
             security: SecurityConfig::default(),
             ssh: SshConfig::default(),
         }
@@ -153,6 +156,14 @@ impl Config {
         validate_non_zero_size("ring_buffer.max_size", self.ring_buffer.max_size)?;
         validate_non_zero_size("logging.max_file_size", self.logging.max_file_size)?;
         validate_non_zero_duration("logging.flush_interval", self.logging.flush_interval)?;
+        validate_non_empty_path("internal_log.daemon_log", &self.internal_log.daemon_log)?;
+        validate_non_empty_path("internal_log.client_log", &self.internal_log.client_log)?;
+        validate_absolute_path("internal_log.daemon_log", &self.internal_log.daemon_log)?;
+        validate_absolute_path("internal_log.client_log", &self.internal_log.client_log)?;
+        validate_non_zero_size(
+            "internal_log.max_file_size",
+            self.internal_log.max_file_size,
+        )?;
 
         if self.daemon.idle_exit {
             validate_non_zero_duration("daemon.idle_exit_after", self.daemon.idle_exit_after)?;
@@ -175,6 +186,11 @@ impl Config {
         if self.logging.retention_days == 0 {
             return Err(PersistError::config_validation(
                 "logging.retention_days must be greater than zero",
+            ));
+        }
+        if self.internal_log.max_files == 0 {
+            return Err(PersistError::config_validation(
+                "internal_log.max_files must be greater than zero",
             ));
         }
         if self.ssh.bypass_env.trim().is_empty() {
@@ -207,6 +223,9 @@ impl Config {
         }
         if let Some(logging) = partial.logging {
             self.logging.apply(logging);
+        }
+        if let Some(internal_log) = partial.internal_log {
+            self.internal_log.apply(internal_log)?;
         }
         if let Some(security) = partial.security {
             self.security.apply(security);
@@ -279,6 +298,16 @@ fn validate_non_empty_path(name: &'static str, path: &Path) -> Result<()> {
         )))
     } else {
         Ok(())
+    }
+}
+
+fn validate_absolute_path(name: &'static str, path: &Path) -> Result<()> {
+    if path.is_absolute() {
+        Ok(())
+    } else {
+        Err(PersistError::config_validation(format!(
+            "{name} must be an absolute path"
+        )))
     }
 }
 

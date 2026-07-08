@@ -26,6 +26,11 @@ fn default_config_has_safe_values() {
     assert!(config.daemon.auto_start);
     assert!(config.session.new_session_on_ssh);
     assert!(config.ring_buffer.replay_on_attach);
+    assert_eq!(config.internal_log.level.to_string(), "info");
+    assert_eq!(
+        config.internal_log.client_log,
+        PathBuf::from("/home/alice/.local/state/persistshell/client.log")
+    );
     assert!(!config.security.allow_root_attach_others);
     assert!(!config.security.enable_input_recording);
     assert_eq!(config.ssh.bypass_env, "PERSIST_DISABLE");
@@ -61,6 +66,11 @@ default_size = "16MB"
 
 [runtime]
 socket_dir = "/run/user/1234/custom"
+
+[internal_log]
+level = "debug"
+client_log = "/tmp/persistshell-client.log"
+max_file_size = "10MB"
 "#,
     )
     .expect("write user config");
@@ -82,6 +92,12 @@ socket_dir = "/run/user/1234/custom"
         config.paths.socket_path,
         PathBuf::from("/run/user/1234/custom/persist.sock")
     );
+    assert_eq!(config.internal_log.level.to_string(), "debug");
+    assert_eq!(
+        config.internal_log.client_log,
+        PathBuf::from("/tmp/persistshell-client.log")
+    );
+    assert_eq!(config.internal_log.max_file_size.to_string(), "10MB");
 }
 
 #[test]

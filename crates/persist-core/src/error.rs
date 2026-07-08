@@ -21,6 +21,20 @@ pub enum PersistError {
     InvalidArgument {
         message: String,
     },
+    LogConfig {
+        message: String,
+    },
+    LogInit {
+        path: PathBuf,
+        source: io::Error,
+    },
+    LoggerState {
+        message: String,
+    },
+    LogWrite {
+        path: PathBuf,
+        source: io::Error,
+    },
     MissingEnvironment {
         name: &'static str,
     },
@@ -53,6 +67,18 @@ impl PersistError {
         }
     }
 
+    pub fn logger_config(message: impl Into<String>) -> Self {
+        Self::LogConfig {
+            message: message.into(),
+        }
+    }
+
+    pub fn logger_state() -> Self {
+        Self::LoggerState {
+            message: "internal logger state is unavailable".to_string(),
+        }
+    }
+
     pub fn not_implemented(feature: &'static str) -> Self {
         Self::NotImplemented { feature }
     }
@@ -79,6 +105,24 @@ impl fmt::Display for PersistError {
                 write!(formatter, "config validation error: {message}")
             }
             Self::InvalidArgument { message } => write!(formatter, "invalid argument: {message}"),
+            Self::LogConfig { message } => {
+                write!(formatter, "logging configuration error: {message}")
+            }
+            Self::LogInit { path, source } => {
+                write!(
+                    formatter,
+                    "failed to initialize log file {}: {source}",
+                    path.display()
+                )
+            }
+            Self::LoggerState { message } => write!(formatter, "logger state error: {message}"),
+            Self::LogWrite { path, source } => {
+                write!(
+                    formatter,
+                    "failed to write log file {}: {source}",
+                    path.display()
+                )
+            }
             Self::MissingEnvironment { name } => {
                 write!(
                     formatter,
@@ -96,7 +140,10 @@ impl fmt::Display for PersistError {
 impl Error for PersistError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            Self::ConfigRead { source, .. } | Self::Io { source, .. } => Some(source),
+            Self::ConfigRead { source, .. }
+            | Self::Io { source, .. }
+            | Self::LogInit { source, .. }
+            | Self::LogWrite { source, .. } => Some(source),
             _ => None,
         }
     }

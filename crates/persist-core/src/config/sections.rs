@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 use super::{expand_uid_template, ByteSize, DurationValue};
 use crate::error::Result;
+use crate::logging::{LogLevel, LoggerConfig};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DaemonConfig {
@@ -158,6 +159,54 @@ impl LoggingConfig {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct InternalLogConfig {
+    pub level: LogLevel,
+    pub daemon_log: PathBuf,
+    pub client_log: PathBuf,
+    pub max_file_size: ByteSize,
+    pub max_files: u32,
+}
+
+impl InternalLogConfig {
+    pub fn default_with_state_dir(state_dir: &std::path::Path) -> Self {
+        Self {
+            level: LogLevel::Info,
+            daemon_log: state_dir.join("daemon.log"),
+            client_log: state_dir.join("client.log"),
+            max_file_size: ByteSize::from_bytes(20 * 1024 * 1024),
+            max_files: 5,
+        }
+    }
+
+    pub fn daemon_logger_config(&self) -> LoggerConfig {
+        LoggerConfig::file(self.daemon_log.clone(), self.level)
+    }
+
+    pub fn client_logger_config(&self) -> LoggerConfig {
+        LoggerConfig::file(self.client_log.clone(), self.level)
+    }
+
+    pub(super) fn apply(&mut self, partial: PartialInternalLogConfig) -> Result<()> {
+        if let Some(value) = partial.level {
+            self.level = value;
+        }
+        if let Some(value) = partial.daemon_log {
+            self.daemon_log = expand_uid_template(value)?;
+        }
+        if let Some(value) = partial.client_log {
+            self.client_log = expand_uid_template(value)?;
+        }
+        if let Some(value) = partial.max_file_size {
+            self.max_file_size = value;
+        }
+        if let Some(value) = partial.max_files {
+            self.max_files = value;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct SecurityConfig {
     pub allow_root_attach_others: bool,
@@ -209,6 +258,7 @@ pub(super) struct PartialConfig {
     pub(super) session: Option<PartialSessionConfig>,
     pub(super) ring_buffer: Option<PartialRingBufferConfig>,
     pub(super) logging: Option<PartialLoggingConfig>,
+    pub(super) internal_log: Option<PartialInternalLogConfig>,
     pub(super) security: Option<PartialSecurityConfig>,
     pub(super) ssh: Option<PartialSshConfig>,
 }
@@ -252,6 +302,16 @@ pub(super) struct PartialLoggingConfig {
     max_files: Option<u32>,
     retention_days: Option<u32>,
     flush_interval: Option<DurationValue>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub(super) struct PartialInternalLogConfig {
+    level: Option<LogLevel>,
+    daemon_log: Option<String>,
+    client_log: Option<String>,
+    max_file_size: Option<ByteSize>,
+    max_files: Option<u32>,
 }
 
 #[derive(Debug, Default, Deserialize)]

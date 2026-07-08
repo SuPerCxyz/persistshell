@@ -64,9 +64,12 @@ Phase 1 Session 日志不定位为企业审计系统。
 
 ```text
 ~/.local/state/persistshell/daemon.log
+~/.local/state/persistshell/client.log
 ```
 
 或者遵循 XDG 目录规范。
+
+M03 已实现内部运行日志的基础文件 writer。Session 输出日志仍未实现。
 
 ---
 
@@ -157,6 +160,8 @@ session.log
 session.log.1
 session.log.2.gz
 ```
+
+M03 暂未实现完整轮转，只保留配置项和校验。完整轮转必须在后续日志任务中实现。
 
 ---
 

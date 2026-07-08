@@ -199,6 +199,8 @@ persist daemon status
 persist doctor
 ```
 
+M03 起会显示配置有效状态和 client 内部日志路径。
+
 后续可支持：
 
 ```bash

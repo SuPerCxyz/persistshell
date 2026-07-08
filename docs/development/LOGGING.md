@@ -110,6 +110,17 @@ Client 诊断日志可选：
 ~/.local/state/persistshell/client.log
 ```
 
+M03 已实现上述默认路径，并通过配置段覆盖：
+
+```toml
+[internal_log]
+level = "info"
+daemon_log = "/home/alice/.local/state/persistshell/daemon.log"
+client_log = "/home/alice/.local/state/persistshell/client.log"
+max_file_size = "20MB"
+max_files = 5
+```
+
 ---
 
 ## 权限
@@ -140,6 +151,8 @@ max_file_size = "20MB"
 max_files = 5
 level = "info"
 ```
+
+M03 只实现配置解析、校验和基础文件写入；完整轮转实现保留给后续任务。
 
 ---
 
@@ -241,8 +254,17 @@ Debug 和 Trace 只能在用户显式开启时使用。
 
 - 日志文件创建
 - 权限正确
-- 轮转
+- 轮转配置解析和校验
 - debug level
 - 敏感信息不输出
 - 日志目录不可写
 - daemon 仍能给出明确错误
+
+M03 已覆盖：
+
+- 日志文件创建。
+- 日志目录 `0700`。
+- 日志文件 `0600`。
+- 级别过滤。
+- 初始化错误。
+- 敏感关键词整条消息脱敏。

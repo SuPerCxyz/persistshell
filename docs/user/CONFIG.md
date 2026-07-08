@@ -52,6 +52,12 @@ M02 实现以下能力：
 - 配置校验错误会返回明确字段名。
 - `persist config` 和 `persist config show` 显示当前有效配置。
 
+M03 实现以下能力：
+
+- `internal_log` 内部运行日志配置。
+- client/daemon 内部日志路径解析。
+- 内部日志基础文件写入、级别过滤和权限设置。
+
 ---
 
 ## 示例配置
@@ -82,6 +88,13 @@ max_file_size = "100MB"
 max_files = 10
 retention_days = 30
 flush_interval = "1s"
+
+[internal_log]
+level = "info"
+daemon_log = "/home/alice/.local/state/persistshell/daemon.log"
+client_log = "/home/alice/.local/state/persistshell/client.log"
+max_file_size = "20MB"
+max_files = 5
 
 [security]
 allow_root_attach_others = false
@@ -300,6 +313,59 @@ retention_days = 30
 
 ---
 
+## internal_log
+
+`internal_log` 描述 PersistShell 自身运行日志，不是 Session 输出日志。
+
+默认路径：
+
+```text
+~/.local/state/persistshell/daemon.log
+~/.local/state/persistshell/client.log
+```
+
+### level
+
+内部日志级别。
+
+默认：
+
+```toml
+level = "info"
+```
+
+可选值：
+
+```text
+error, warn, info, debug, trace
+```
+
+### daemon_log
+
+daemon 内部日志文件路径。
+
+必须是绝对路径。
+
+### client_log
+
+client 内部日志文件路径。
+
+必须是绝对路径。
+
+### max_file_size
+
+内部日志单个文件最大大小。
+
+M03 已支持配置解析和校验；完整轮转逻辑保留到后续任务。
+
+### max_files
+
+内部日志保留轮转文件数量。
+
+M03 已支持配置解析和校验；完整轮转逻辑保留到后续任务。
+
+---
+
 ## security
 
 ### allow_root_attach_others
@@ -373,6 +439,10 @@ M02 至少校验：
 - `logging.max_files` 必须大于 0。
 - `logging.retention_days` 必须大于 0。
 - `logging.flush_interval` 必须大于 0。
+- `internal_log.daemon_log` 必须是绝对路径。
+- `internal_log.client_log` 必须是绝对路径。
+- `internal_log.max_file_size` 必须大于 0。
+- `internal_log.max_files` 必须大于 0。
 - `ssh.bypass_env` 不能为空。
 - `security.allow_root_attach_others` 在 Phase 1 必须为 `false`。
 

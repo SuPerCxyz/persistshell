@@ -18,6 +18,7 @@
 - `persist-core`、`persist-pty`、`persist-ipc`、`persist-metadata` crate 边界。
 - GitHub Actions CI 和 package workflow。
 - 基础配置系统：默认配置、系统配置、用户配置、TOML 解析、校验和 `persist config show`。
+- 基础内部日志框架：`internal_log` 配置、client/daemon 日志路径、文件写入、级别过滤和权限设置。
 
 尚未实现：
 
@@ -29,7 +30,7 @@
 
 下一步唯一任务：
 
-- M03 基础内部日志框架。
+- M04 错误处理框架。
 
 ## 后续 Agent 启动顺序
 

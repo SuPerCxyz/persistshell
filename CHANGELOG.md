@@ -14,6 +14,7 @@
 - 添加 Rust fmt、clippy、test 验证，以及 GitHub Actions CI/package workflow。
 - 添加基础错误、配置路径、日志初始化和 Session 状态模型。
 - 添加基础配置系统，支持默认值、系统配置、用户配置、TOML 解析、配置校验和 `persist config show`。
+- 添加基础内部日志框架，支持 `internal_log` 配置、文件日志初始化、级别过滤、权限设置和敏感关键词最小脱敏。
 - 添加 GitHub Actions CI 与发布包构建要求，记录 GitHub 镜像仓库 `https://github.com/SuPerCxyz/persistshell`。
 - 初始化 PersistShell 项目文档体系。
 - 添加 README.md。
@@ -37,6 +38,7 @@
 - 确定 PersistShell 主开发语言为 Rust，并同步 Agent 规则、开发规范和目录结构文档。
 - 调整 Session 退出语义：`exit`/`Ctrl-D` 进入 Closed 状态，释放 shell runtime，但保留可恢复的输出、cwd、环境变量快照和 metadata。
 - 明确另一台电脑可以 attach 到已有 Session 并获取可写操作权；只读 attach 只是可选模式，不是跨电脑进入会话的唯一方式。
+- 将 M02/M03 标记完成，下一任务更新为 M04 错误处理框架。
 
 ### Fixed
 
