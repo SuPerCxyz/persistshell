@@ -25,12 +25,38 @@ PersistShell/
   Cargo.lock
 
   docs/
+  .github/
   crates/
   tests/
   scripts/
   packaging/
   examples/
 ```
+
+---
+
+## .github/
+
+GitHub Actions workflow 目录。
+
+代码会自动同步到 GitHub 仓库：
+
+```text
+https://github.com/SuPerCxyz/persistshell
+```
+
+GitHub Actions 在该仓库运行。后续应创建：
+
+```text
+.github/
+  workflows/
+    ci.yml
+    package.yml
+```
+
+`ci.yml` 负责 fmt、clippy、test。
+
+`package.yml` 负责构建 tarball、deb/rpm 和 checksum，并上传 artifacts。
 
 ---
 

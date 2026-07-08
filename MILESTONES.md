@@ -26,7 +26,7 @@
 | 编号 | 里程碑 | 状态 | 说明 |
 |---|---|---|---|
 | M00 | 文档体系初始化 | ☐ 未开始 | 建立 README、原则、路线图、架构文档、开发规范 |
-| M01 | 工程初始化 | ☐ 未开始 | 初始化 Rust workspace、构建系统、目录结构、CI、测试框架 |
+| M01 | 工程初始化 | ☐ 未开始 | 初始化 Rust workspace、构建系统、目录结构、GitHub Actions CI、测试框架 |
 
 ---
 
@@ -101,7 +101,7 @@
 | M45 | 性能 Benchmark | ☐ 未开始 | 100/500/1000 Session 测试 |
 | M46 | 安全审查 | ☐ 未开始 | Socket、日志、权限、注入风险 |
 | M47 | 兼容性矩阵 | ☐ 未开始 | 主流发行版、Shell、Terminal |
-| M48 | 打包 | ☐ 未开始 | deb/rpm/tarball |
+| M48 | 打包 | ☐ 未开始 | GitHub Actions 构建 tarball/deb/rpm 和 checksums |
 | M49 | Man Page | ☐ 未开始 | 命令手册 |
 | M50 | Shell Completion | ☐ 未开始 | bash/zsh/fish completion |
 | M51 | v1.0 文档完善 | ☐ 未开始 | 用户文档、FAQ、故障排查 |

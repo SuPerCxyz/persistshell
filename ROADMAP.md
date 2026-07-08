@@ -121,6 +121,9 @@ SSH 断开后，Shell 和任务继续运行。
 - 崩溃恢复策略
 - systemd user service 集成
 - 非 systemd fallback
+- GitHub Actions CI
+- GitHub Actions package build
+- GitHub Release artifacts
 
 ---
 
@@ -135,6 +138,7 @@ SSH 断开后，Shell 和任务继续运行。
 - 完整文档
 - 安装脚本
 - 包管理初步支持
+- GitHub Actions 构建发布包
 - Debian/RPM 打包
 - Man page
 - Shell completion

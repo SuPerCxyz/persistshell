@@ -27,6 +27,7 @@ PersistShell 不是 SSH 客户端，不是终端模拟器，不是 tmux、screen
 - 第一版只支持 Linux。
 - 第一版聚焦单用户 per-user daemon，不做多人协作会话。
 - 非交互 SSH、scp、rsync、git remote command 等场景必须可绕过。
+- 代码会自动同步到 GitHub 仓库 `https://github.com/SuPerCxyz/persistshell`，GitHub Actions 必须支持 CI 和发布包构建。
 
 ## 命名与路径约定
 

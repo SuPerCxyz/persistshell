@@ -293,13 +293,18 @@ Terminal：
 
 ## 自动化要求
 
-CI 至少运行：
+GitHub Actions CI 至少运行：
 
-- fmt
-- lint
-- unit tests
-- integration tests
+- `cargo fmt --all -- --check`
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `cargo test --workspace --all-features`
 - basic build
+
+GitHub Actions package workflow 至少验证：
+
+- release tarball 可构建
+- artifact 可上传
+- SHA256 checksum 可生成
 
 PTY/E2E 测试可以分为 privileged 或 nightly。
 

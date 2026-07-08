@@ -50,6 +50,7 @@ PersistShell 不是 SSH 客户端、SSH Server、终端模拟器、Terminal Mult
 - 自研 PTY 会话管理器，不封装 tmux/screen 作为核心实现。
 - 第一版只支持 Linux，聚焦 per-user daemon。
 - 非交互 SSH、scp、sftp、rsync、ansible、git remote command 等场景必须可绕过。
+- 代码会自动同步到 `https://github.com/SuPerCxyz/persistshell`，GitHub Actions 必须支持 CI 和发布包构建。
 
 ## 开发原则
 

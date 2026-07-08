@@ -10,6 +10,7 @@
 
 ### Added
 
+- 添加 GitHub Actions CI 与发布包构建要求，记录 GitHub 镜像仓库 `https://github.com/SuPerCxyz/persistshell`。
 - 初始化 PersistShell 项目文档体系。
 - 添加 README.md。
 - 添加项目原则文档。

@@ -91,6 +91,28 @@ Docs as Single Source of Truth
 
 ---
 
+## CI 和包构建规则
+
+PersistShell 代码会自动同步到 GitHub 仓库：
+
+```text
+https://github.com/SuPerCxyz/persistshell
+```
+
+GitHub Actions 必须支持常规 CI 和发布包构建。
+
+常规 CI 至少包含：
+
+- `cargo fmt --all -- --check`
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`
+- `cargo test --workspace --all-features`
+
+包构建 workflow 必须能在 GitHub Actions 中构建 release artifacts，至少包含 Linux tarball 和 checksum；后续发布阶段扩展 `.deb` 和 `.rpm`。
+
+workflow 不得依赖内网 Git 地址、开发者本机路径或私有 SSH 配置。
+
+---
+
 ## 代码修改原则
 
 代码修改必须：

@@ -47,6 +47,7 @@
 - `docs/development/LOGGING.md`
 - `docs/development/TESTING.md`
 - `docs/development/BENCHMARK.md`
+- `docs/development/CI.md`
 
 ## 用户文档
 

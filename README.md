@@ -261,6 +261,26 @@ Rust 被选为主语言，是因为 PersistShell 需要长期维护 Linux 基础
 
 ---
 
+## CI 和发布包
+
+代码会自动同步到 GitHub 仓库：
+
+```text
+https://github.com/SuPerCxyz/persistshell
+```
+
+GitHub Actions 必须支持：
+
+- Rust fmt / clippy / test。
+- Linux release tarball 构建。
+- 后续 `.deb` 和 `.rpm` 包构建。
+- release artifact 上传。
+- SHA256 checksum 生成。
+
+GitHub Actions workflow 不应依赖自建 Git 服务、开发者本机路径或私有 SSH 配置。
+
+---
+
 ## Phase 1 MVP 目标
 
 第一阶段只做核心能力：

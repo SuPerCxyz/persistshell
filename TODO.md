@@ -51,7 +51,8 @@
 - [ ] 确定 Rust MSRV
 - [ ] 初始化构建系统
 - [ ] 初始化测试框架
-- [ ] 初始化 CI
+- [ ] 初始化 GitHub Actions CI
+- [ ] 初始化 GitHub Actions package workflow
 - [ ] 初始化 rustfmt
 - [ ] 初始化 clippy
 - [ ] 初始化目录结构
@@ -296,7 +297,9 @@
 - [ ] deb package
 - [ ] rpm package
 - [ ] tarball release
-- [ ] GitHub Actions release
+- [ ] GitHub Actions package build
+- [ ] GitHub Actions artifact upload
+- [ ] 生成 release checksums
 - [ ] Security review
 - [ ] Compatibility matrix
 - [ ] Performance regression
