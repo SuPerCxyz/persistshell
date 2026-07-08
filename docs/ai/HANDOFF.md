@@ -17,6 +17,7 @@
 - `persistd` daemon 骨架。
 - `persist-core`、`persist-pty`、`persist-ipc`、`persist-metadata` crate 边界。
 - GitHub Actions CI 和 package workflow。
+- 基础配置系统：默认配置、系统配置、用户配置、TOML 解析、校验和 `persist config show`。
 
 尚未实现：
 
@@ -25,6 +26,10 @@
 - IPC streaming。
 - metadata database。
 - SSH 自动接管和安装器。
+
+下一步唯一任务：
+
+- M03 基础内部日志框架。
 
 ## 后续 Agent 启动顺序
 

@@ -13,6 +13,7 @@
 - 初始化 Rust Cargo workspace，新增 `persist` CLI、`persistd` daemon 骨架和 core/pty/ipc/metadata crate 边界。
 - 添加 Rust fmt、clippy、test 验证，以及 GitHub Actions CI/package workflow。
 - 添加基础错误、配置路径、日志初始化和 Session 状态模型。
+- 添加基础配置系统，支持默认值、系统配置、用户配置、TOML 解析、配置校验和 `persist config show`。
 - 添加 GitHub Actions CI 与发布包构建要求，记录 GitHub 镜像仓库 `https://github.com/SuPerCxyz/persistshell`。
 - 初始化 PersistShell 项目文档体系。
 - 添加 README.md。

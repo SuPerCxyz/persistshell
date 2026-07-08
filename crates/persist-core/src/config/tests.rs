@@ -1,0 +1,164 @@
+use std::env;
+use std::fs;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use super::*;
+
+#[test]
+fn derives_xdg_paths_from_home() {
+    let paths = test_paths("/tmp/runtime");
+
+    assert_eq!(
+        paths.config_dir,
+        PathBuf::from("/home/alice/.config/persistshell")
+    );
+    assert_eq!(
+        paths.socket_path,
+        PathBuf::from("/tmp/runtime/persistshell/persist.sock")
+    );
+}
+
+#[test]
+fn default_config_has_safe_values() {
+    let config = Config::default_with_paths(test_paths("/tmp/runtime"));
+
+    assert!(config.daemon.auto_start);
+    assert!(config.session.new_session_on_ssh);
+    assert!(config.ring_buffer.replay_on_attach);
+    assert!(!config.security.allow_root_attach_others);
+    assert!(!config.security.enable_input_recording);
+    assert_eq!(config.ssh.bypass_env, "PERSIST_DISABLE");
+}
+
+#[test]
+fn loads_system_then_user_config() {
+    let dir = TestDir::new("merge");
+    let system_config = dir.path.join("system.toml");
+    let user_config = dir.path.join("user.toml");
+
+    fs::write(
+        &system_config,
+        r#"
+[daemon]
+auto_start = false
+idle_exit_after = "5m"
+
+[ring_buffer]
+default_size = "4MB"
+max_size = "64MB"
+"#,
+    )
+    .expect("write system config");
+    fs::write(
+        &user_config,
+        r#"
+[daemon]
+idle_exit = false
+
+[ring_buffer]
+default_size = "16MB"
+
+[runtime]
+socket_dir = "/run/user/1234/custom"
+"#,
+    )
+    .expect("write user config");
+
+    let options =
+        ConfigLoadOptions::from_paths(test_paths("/tmp/runtime"), system_config, user_config);
+    let config = load_config(&options).expect("load config");
+
+    assert!(!config.daemon.auto_start);
+    assert!(!config.daemon.idle_exit);
+    assert_eq!(config.daemon.idle_exit_after.to_string(), "5m");
+    assert_eq!(config.ring_buffer.default_size.to_string(), "16MB");
+    assert_eq!(config.ring_buffer.max_size.to_string(), "64MB");
+    assert_eq!(
+        config.runtime.socket_dir,
+        PathBuf::from("/run/user/1234/custom")
+    );
+    assert_eq!(
+        config.paths.socket_path,
+        PathBuf::from("/run/user/1234/custom/persist.sock")
+    );
+}
+
+#[test]
+fn rejects_invalid_ring_buffer_limits() {
+    let dir = TestDir::new("invalid-ring-buffer");
+    let user_config = dir.path.join("user.toml");
+    fs::write(
+        &user_config,
+        r#"
+[ring_buffer]
+default_size = "256MB"
+max_size = "128MB"
+"#,
+    )
+    .expect("write user config");
+
+    let options = ConfigLoadOptions::from_paths(
+        test_paths("/tmp/runtime"),
+        dir.path.join("missing-system.toml"),
+        user_config,
+    );
+    let error = load_config(&options).expect_err("invalid config");
+
+    assert!(matches!(error, PersistError::ConfigValidation { .. }));
+    assert!(error.to_string().contains("default_size"));
+}
+
+#[test]
+fn rejects_parse_errors_with_path_context() {
+    let dir = TestDir::new("parse");
+    let user_config = dir.path.join("user.toml");
+    fs::write(&user_config, "[daemon]\nauto_start = nope\n").expect("write user config");
+
+    let options = ConfigLoadOptions::from_paths(
+        test_paths("/tmp/runtime"),
+        dir.path.join("missing-system.toml"),
+        user_config.clone(),
+    );
+    let error = load_config(&options).expect_err("parse error");
+
+    assert!(matches!(error, PersistError::ConfigParse { .. }));
+    assert!(error
+        .to_string()
+        .contains(user_config.to_string_lossy().as_ref()));
+}
+
+fn test_paths(runtime_base: &str) -> ConfigPaths {
+    ConfigPaths::from_base_dirs(
+        PathBuf::from("/home/alice"),
+        None,
+        None,
+        None,
+        PathBuf::from(runtime_base),
+    )
+}
+
+struct TestDir {
+    path: PathBuf,
+}
+
+impl TestDir {
+    fn new(name: &str) -> Self {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_nanos();
+        let path = env::temp_dir().join(format!(
+            "persistshell-config-test-{name}-{}-{nanos}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&path).expect("create test dir");
+        Self { path }
+    }
+}
+
+impl Drop for TestDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}

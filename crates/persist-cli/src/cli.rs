@@ -1,7 +1,10 @@
 use std::io::{self, Write};
 use std::process::ExitCode;
 
-use persist_core::{init_logging, load_default_config, version_string, LoggerConfig, PersistError};
+use persist_core::{
+    init_logging, load_config, load_default_config, version_string, Config, ConfigLoadOptions,
+    LoggerConfig, PersistError,
+};
 
 use crate::command::{parse_command, Command};
 
@@ -46,6 +49,7 @@ fn execute<W: Write>(command: Command, stdout: &mut W) -> Result<(), PersistErro
             })
         }
         Command::Doctor => write_doctor(stdout),
+        Command::Config => write_config(stdout),
         Command::Daemon { action } => Err(PersistError::not_implemented(match action.as_deref() {
             Some("start") => "persist daemon start",
             Some("stop") => "persist daemon stop",
@@ -83,6 +87,7 @@ Available now:
   help       Show this help
   version    Show version information
   doctor     Show local skeleton diagnostics
+  config     Show effective configuration
 
 Planned commands:
   new, ls, attach, detach, kill, rename, daemon, install, uninstall
@@ -92,6 +97,162 @@ Planned commands:
         operation: "write help",
         source,
     })
+}
+
+fn write_config<W: Write>(stdout: &mut W) -> Result<(), PersistError> {
+    let options = ConfigLoadOptions::from_environment()?;
+    let config = load_config(&options)?;
+    write_config_values(stdout, &options, &config)
+}
+
+fn write_config_values<W: Write>(
+    stdout: &mut W,
+    options: &ConfigLoadOptions,
+    config: &Config,
+) -> Result<(), PersistError> {
+    write_config_values_inner(stdout, options, config).map_err(|source| PersistError::Io {
+        operation: "write config output",
+        source,
+    })
+}
+
+fn write_config_values_inner<W: Write>(
+    stdout: &mut W,
+    options: &ConfigLoadOptions,
+    config: &Config,
+) -> io::Result<()> {
+    writeln!(stdout, "PersistShell config")?;
+    write_config_sources(stdout, options)?;
+    write_config_paths(stdout, config)?;
+    write_daemon_config(stdout, config)?;
+    write_runtime_config(stdout, config)?;
+    write_session_config(stdout, config)?;
+    write_ring_buffer_config(stdout, config)?;
+    write_logging_config(stdout, config)?;
+    write_security_config(stdout, config)?;
+    write_ssh_config(stdout, config)
+}
+
+fn write_config_sources<W: Write>(stdout: &mut W, options: &ConfigLoadOptions) -> io::Result<()> {
+    writeln!(
+        stdout,
+        "system_config: {}",
+        options.system_config_path.display()
+    )?;
+    writeln!(
+        stdout,
+        "user_config: {}",
+        options.user_config_path.display()
+    )
+}
+
+fn write_config_paths<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(stdout, "config_dir: {}", config.paths.config_dir.display())?;
+    writeln!(stdout, "data_dir: {}", config.paths.data_dir.display())?;
+    writeln!(stdout, "state_dir: {}", config.paths.state_dir.display())?;
+    writeln!(
+        stdout,
+        "runtime_dir: {}",
+        config.paths.runtime_dir.display()
+    )?;
+    writeln!(stdout, "socket: {}", config.paths.socket_path.display())
+}
+
+fn write_daemon_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(stdout, "daemon.auto_start: {}", config.daemon.auto_start)?;
+    writeln!(stdout, "daemon.idle_exit: {}", config.daemon.idle_exit)?;
+    writeln!(
+        stdout,
+        "daemon.idle_exit_after: {}",
+        config.daemon.idle_exit_after
+    )
+}
+
+fn write_runtime_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(
+        stdout,
+        "runtime.socket_dir: {}",
+        config.runtime.socket_dir.display()
+    )
+}
+
+fn write_session_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(
+        stdout,
+        "session.new_session_on_ssh: {}",
+        config.session.new_session_on_ssh
+    )?;
+    writeln!(
+        stdout,
+        "session.default_shell: {}",
+        config.session.default_shell
+    )?;
+    writeln!(stdout, "session.kill_grace: {}", config.session.kill_grace)
+}
+
+fn write_ring_buffer_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(
+        stdout,
+        "ring_buffer.default_size: {}",
+        config.ring_buffer.default_size
+    )?;
+    writeln!(
+        stdout,
+        "ring_buffer.max_size: {}",
+        config.ring_buffer.max_size
+    )?;
+    writeln!(
+        stdout,
+        "ring_buffer.replay_on_attach: {}",
+        config.ring_buffer.replay_on_attach
+    )?;
+    writeln!(
+        stdout,
+        "ring_buffer.replay_bytes: {}",
+        config.ring_buffer.replay_bytes
+    )
+}
+
+fn write_logging_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(
+        stdout,
+        "logging.session_log: {}",
+        config.logging.session_log
+    )?;
+    writeln!(
+        stdout,
+        "logging.max_file_size: {}",
+        config.logging.max_file_size
+    )?;
+    writeln!(stdout, "logging.max_files: {}", config.logging.max_files)?;
+    writeln!(
+        stdout,
+        "logging.retention_days: {}",
+        config.logging.retention_days
+    )?;
+    writeln!(
+        stdout,
+        "logging.flush_interval: {}",
+        config.logging.flush_interval
+    )
+}
+
+fn write_security_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(
+        stdout,
+        "security.allow_root_attach_others: {}",
+        config.security.allow_root_attach_others
+    )?;
+    writeln!(
+        stdout,
+        "security.enable_input_recording: {}",
+        config.security.enable_input_recording
+    )
+}
+
+fn write_ssh_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(stdout, "ssh.auto_hook: {}", config.ssh.auto_hook)?;
+    writeln!(stdout, "ssh.bypass_env: {}", config.ssh.bypass_env)
 }
 
 fn write_doctor<W: Write>(stdout: &mut W) -> Result<(), PersistError> {
@@ -149,5 +310,30 @@ mod tests {
         assert!(String::from_utf8(err)
             .expect("utf8")
             .contains("unknown persist command"));
+    }
+
+    #[test]
+    fn config_output_contains_effective_values() {
+        let paths = persist_core::ConfigPaths::from_base_dirs(
+            "/home/alice".into(),
+            None,
+            None,
+            None,
+            "/run/user/1000".into(),
+        );
+        let options = ConfigLoadOptions::from_paths(
+            paths.clone(),
+            "/etc/persistshell/config.toml".into(),
+            paths.config_dir.join("config.toml"),
+        );
+        let config = Config::default_with_paths(paths);
+        let mut out = Vec::new();
+
+        write_config_values(&mut out, &options, &config).expect("write config");
+
+        let output = String::from_utf8(out).expect("utf8");
+        assert!(output.contains("daemon.auto_start: true"));
+        assert!(output.contains("ring_buffer.default_size: 8MB"));
+        assert!(output.contains("ssh.bypass_env: PERSIST_DISABLE"));
     }
 }

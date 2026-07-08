@@ -18,15 +18,39 @@
 /etc/persistshell/config.toml
 ```
 
-Phase 1 可以只支持用户配置。
+M02 已支持用户配置和系统配置。配置文件不存在时会被忽略；配置文件存在但无法读取、格式错误或校验失败时，命令必须返回明确错误。
 
 ---
 
 ## 配置优先级
 
+完整目标优先级：
+
 ```text
 命令行参数 > 环境变量 > 用户配置 > 系统配置 > 默认值
 ```
+
+M02 已实现：
+
+```text
+用户配置 > 系统配置 > 默认值
+```
+
+命令行参数和环境变量覆盖保留给后续具体命令实现。
+
+---
+
+## 当前实现状态
+
+M02 实现以下能力：
+
+- 内置安全默认配置。
+- 加载 `/etc/persistshell/config.toml`。
+- 加载 `~/.config/persistshell/config.toml`。
+- 用户配置覆盖系统配置。
+- TOML 格式错误会返回路径和解析错误。
+- 配置校验错误会返回明确字段名。
+- `persist config` 和 `persist config show` 显示当前有效配置。
 
 ---
 
@@ -70,6 +94,38 @@ bypass_env = "PERSIST_DISABLE"
 
 ---
 
+## 值格式
+
+大小字段支持整数或字符串：
+
+```toml
+default_size = "8MB"
+replay_bytes = "512KB"
+max_size = 134217728
+```
+
+支持单位：
+
+```text
+B, KB, MB, GB, TB
+```
+
+时长字段支持整数秒或字符串：
+
+```toml
+idle_exit_after = "10m"
+kill_grace = "3s"
+flush_interval = 1
+```
+
+支持单位：
+
+```text
+ms, s, m, h
+```
+
+---
+
 ## daemon
 
 ### auto_start
@@ -92,6 +148,32 @@ daemon 在没有 running session 时是否空闲退出。
 
 ```toml
 idle_exit = true
+```
+
+---
+
+## runtime
+
+### socket_dir
+
+Unix Socket 目录。
+
+默认由运行目录推导：
+
+```text
+/run/user/$UID/persistshell
+```
+
+配置值必须是绝对路径。配置中可以使用 `%UID%` 占位符：
+
+```toml
+socket_dir = "/run/user/%UID%/persistshell"
+```
+
+修改 `runtime.socket_dir` 后，`persist.sock` 路径同步变为：
+
+```text
+<socket_dir>/persist.sock
 ```
 
 ---
@@ -224,7 +306,7 @@ retention_days = 30
 
 root 是否允许 attach 其他用户 Session。
 
-Phase 1 默认不支持。
+Phase 1 不支持，M02 校验会拒绝将该值设置为 `true`。
 
 ```toml
 allow_root_attach_others = false
@@ -278,12 +360,34 @@ PersistShell 启动时必须校验配置。
 配置错误：ring_buffer.default_size 超过 ring_buffer.max_size。
 ```
 
+M02 至少校验：
+
+- `runtime.socket_dir` 不能为空，且必须是绝对路径。
+- `daemon.idle_exit_after` 在 `daemon.idle_exit = true` 时必须大于 0。
+- `session.kill_grace` 必须大于 0。
+- `ring_buffer.default_size` 必须大于 0。
+- `ring_buffer.max_size` 必须大于 0。
+- `ring_buffer.default_size` 不能超过 `ring_buffer.max_size`。
+- `ring_buffer.replay_bytes` 不能超过 `ring_buffer.max_size`。
+- `logging.max_file_size` 必须大于 0。
+- `logging.max_files` 必须大于 0。
+- `logging.retention_days` 必须大于 0。
+- `logging.flush_interval` 必须大于 0。
+- `ssh.bypass_env` 不能为空。
+- `security.allow_root_attach_others` 在 Phase 1 必须为 `false`。
+
 ---
 
 ## 查看配置
 
 ```bash
 persist config show
+```
+
+也可以使用：
+
+```bash
+persist config
 ```
 
 ---

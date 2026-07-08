@@ -17,3 +17,6 @@ authors = ["PersistShell contributors"]
 repository = "https://github.com/SuPerCxyz/persistshell"
 license-file = "LICENSE"
 
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"

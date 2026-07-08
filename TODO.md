@@ -68,12 +68,12 @@
 
 ### 配置系统
 
-- [ ] 支持默认配置
-- [ ] 支持用户配置
-- [ ] 支持系统配置
-- [ ] 支持配置校验
-- [ ] 支持打印当前配置
-- [ ] 支持安全默认值
+- [x] 支持默认配置
+- [x] 支持用户配置
+- [x] 支持系统配置
+- [x] 支持配置校验
+- [x] 支持打印当前配置
+- [x] 支持安全默认值
 
 ### Daemon
 
@@ -211,7 +211,7 @@
 - [ ] persist doctor
 - [ ] persist install
 - [ ] persist uninstall
-- [ ] persist config
+- [x] persist config
 
 ### SSH 接管
 

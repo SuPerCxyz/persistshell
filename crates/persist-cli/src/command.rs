@@ -5,6 +5,7 @@ pub enum Command {
     Help,
     Version,
     Doctor,
+    Config,
     Daemon { action: Option<String> },
     Planned { name: String },
 }
@@ -14,6 +15,7 @@ pub fn parse_command(args: &[String]) -> Result<Command> {
         None | Some("-h" | "--help" | "help") => Ok(Command::Help),
         Some("-V" | "--version" | "version") => Ok(Command::Version),
         Some("doctor") => Ok(Command::Doctor),
+        Some("config") => parse_config_command(&args[1..]),
         Some("daemon") => Ok(Command::Daemon {
             action: args.get(1).cloned(),
         }),
@@ -25,6 +27,19 @@ pub fn parse_command(args: &[String]) -> Result<Command> {
         }),
         Some(other) => Err(PersistError::invalid_argument(format!(
             "unknown persist command: {other}"
+        ))),
+    }
+}
+
+fn parse_config_command(args: &[String]) -> Result<Command> {
+    match args {
+        [] => Ok(Command::Config),
+        [action] if action == "show" => Ok(Command::Config),
+        [action, extra, ..] if action == "show" => Err(PersistError::invalid_argument(format!(
+            "unexpected argument for persist config show: {extra}"
+        ))),
+        [action, ..] => Err(PersistError::invalid_argument(format!(
+            "unknown persist config command: {action}"
         ))),
     }
 }
@@ -42,5 +57,17 @@ mod tests {
     fn parses_version_alias() {
         let args = vec!["--version".to_string()];
         assert_eq!(parse_command(&args).expect("parse"), Command::Version);
+    }
+
+    #[test]
+    fn parses_config_show() {
+        let args = vec!["config".to_string(), "show".to_string()];
+        assert_eq!(parse_command(&args).expect("parse"), Command::Config);
+    }
+
+    #[test]
+    fn rejects_unknown_config_action() {
+        let args = vec!["config".to_string(), "set".to_string()];
+        assert!(parse_command(&args).is_err());
     }
 }
