@@ -30,7 +30,8 @@
 - [ ] 下载 workflow artifact，独立执行 `sha256sum --check`，检查 tarball、deb、rpm 的版本、架构、
   许可证、man page、completion 和用户文档。
 - [ ] 确定是否创建 GitHub Release、附加哪些 artifact、是否生成 release notes。
-- [ ] 审查依赖许可证兼容性；按发布策略决定是否签名、生成 SBOM 或补充 `NOTICE`。
+- [x] 审查 57 个锁定依赖的 Cargo SPDX 元数据；未发现仅提供强 copyleft 许可证的依赖。
+- [ ] 按发布策略决定是否签名、生成 SBOM 或补充 `NOTICE`。
 - [ ] 对外发布后记录 tag、workflow run、artifact checksum、发布日期和支持入口。
 
 ## 当前未覆盖边界
@@ -48,3 +49,5 @@
 
 尚未下载 GitHub artifact、创建 GitHub Release 或签名。提交、push、mirror 同步、`v0.1.0` tag、
 分支/tag CI 和 Package workflow 已完成；剩余操作继续按本清单记录实际结果。
+
+依赖许可证检查基于 Cargo metadata 中的 SPDX 表达式，不替代法律意见。

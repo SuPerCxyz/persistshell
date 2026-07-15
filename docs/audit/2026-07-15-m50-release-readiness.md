@@ -43,11 +43,17 @@ artifact `persistshell-linux-packages`（ID `8342325886`，6,359,905 字节，ar
 `sha256:f3319ec37cc32f252f88e5680cd6a5d20e529e8537b6820b355a33281a873a61`）。匿名下载 API 返回
 401，因此没有把 GitHub 下载副本的内容与 checksum 标记为已复核。
 
+## 依赖许可证元数据
+
+`cargo metadata --locked` 返回 57 个外部依赖。许可证表达式均提供 MIT、Apache-2.0、Zlib、
+Unicode-3.0 或 Unlicense 等宽松许可路径；其中 `r-efi` 的 LGPL-2.1-or-later 是 MIT/Apache-2.0
+之外的可选项，不是唯一许可。未发现仅提供强 copyleft 许可证的依赖。该检查不替代法律意见。
+
 ## 发布阻塞项
 
 以下不是代码质量失败，而是未授权或依赖外部平台的发布动作：
 
 1. 使用具备 GitHub Actions artifact 读取权限的身份下载并复核 artifact。
-2. 决定 GitHub Release、artifact 附件、签名和依赖许可证审查策略。
+2. 决定 GitHub Release、artifact 附件和签名策略。
 
 详细操作顺序见 `docs/release/RELEASE_CHECKLIST.md`。本审计不把这些未执行动作标记为完成。

@@ -22,7 +22,7 @@ M50：v1.0 Release Readiness
 
 ## 当前唯一任务
 
-完成 GitHub artifact 下载复核，并由维护者决定 GitHub Release、签名和依赖许可证审查策略。
+完成 GitHub artifact 下载复核，并由维护者决定 GitHub Release 和签名策略。
 
 ### 前置已完成
 
@@ -44,7 +44,7 @@ M50：v1.0 Release Readiness
 ## 完成标准
 
 1. 下载的 release artifact 均能独立校验 checksum，内容符合 `docs/release/RELEASE_CHECKLIST.md`。
-2. GitHub Release、发布说明、签名和依赖许可证审查状态均按维护者决定记录。
+2. GitHub Release、发布说明和签名状态均按维护者决定记录。
 3. release checklist 与审计记录补充 artifact 复核和最终发布决策。
 
 ---
