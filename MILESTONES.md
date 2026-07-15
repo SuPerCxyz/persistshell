@@ -105,7 +105,7 @@
 | M47 | Man Page | ☑ 已完成 | persist/persistd groff 手册、三种包接入和 test RPM 验证 |
 | M48 | Shell Completion | ☑ 已完成 | bash/zsh/fish completion、三种包接入和 test RPM 验证 |
 | M49 | v1.0 文档完善 | ☑ 已完成 | 用户文档、FAQ、故障排查、三种包文档验证 |
-| M50 | v1.0 Release | ◐ 就绪检查完成 | 已确认发布 0.1.0；待维护者授权提交、v0.1.0 tag 与远端发布 |
+| M50 | v1.0 Release | ◐ tag 已发布 | v0.1.0 与 GitHub workflows 已完成；待 artifact 下载复核及 Release/签名决策 |
 
 ---
 
