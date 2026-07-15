@@ -41,6 +41,8 @@ persist ls
 persist attach <id>
 persist detach
 persist kill <id>
+persist lock <id>
+persist unlock <id>
 persist rename <id> <name>
 persist log <id>
 persist tail <id>
@@ -121,6 +123,13 @@ persist attach 2
 
 跨电脑进入已有会话不能只能是只读。默认应支持可写 attach 或可写接管，并通过单 active writer 策略避免输入冲突。
 
+M35 中 `persist attach <id>` 默认请求写权限。若已有 writer，daemon 会
+通知旧 client 并将写权限交给新 client；旧 client 会显示写权限已移交并退出
+attach。`persist attach --readonly <id>` 的语义不变，不参与写权限交接。
+
+如果 Session 已锁定，读写 attach 均必须失败并说明先执行
+`persist unlock <id>`。锁定状态用于防止误操作，不是访问控制机制。
+
 ---
 
 ## persist detach
@@ -152,6 +161,20 @@ persist kill 2 --force
 - 必须明确这是终止 Session。
 - 对 running session 可以提示确认。
 - 脚本模式可用 `--yes`。
+
+锁定 Session 的 kill 必须被拒绝；用户需要先显式 unlock。
+
+---
+
+## persist lock / unlock
+
+```bash
+persist lock 2
+persist unlock 2
+```
+
+`lock` 将状态持久化，阻止该 Session 的读写 attach、kill 和 Idle GC。
+`unlock` 解除这些限制。`persist ls` 必须显示锁定状态。
 
 ---
 

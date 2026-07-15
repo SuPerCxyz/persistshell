@@ -363,7 +363,8 @@ Phase 1 可以通过 shell pid 的 procfs 尝试读取：
 - /proc/<pid>/cmdline
 - process group
 
-Phase 1 可以简单实现或延后。
+M37 使用 `tcgetpgrp()` 获取前台进程组 leader，并读取其 `comm` 与 `cmdline`。
+读取失败时列表字段为空，不影响 Session 列表。
 
 ---
 

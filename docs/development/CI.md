@@ -62,18 +62,28 @@ cargo test --workspace --all-features
 - tag push，例如 `v*`
 - workflow_dispatch
 
-Phase 1 至少应能构建：
+当前发布包构建必须能生成：
 
 - Linux tarball
+- Debian `.deb`
+- RPM `.rpm`
 - SHA256 checksums
 
 后续发布阶段应支持：
 
-- `.deb`
-- `.rpm`
 - release notes
 - artifact upload
 - 可选签名
+
+本地先构建 release binaries，再执行：
+
+```text
+cargo build --release --workspace --locked
+scripts/package-release.sh tarball deb rpm
+```
+
+本机没有 `rpmbuild` 时，RPM 构建会明确失败；GitHub
+`ubuntu-latest` runner 在 package workflow 中安装 `rpm` 后构建全部三种包。
 
 GitHub Actions 构建出的包必须作为 workflow artifacts 上传，tag release 时可进一步附加到 GitHub Release。
 
@@ -105,8 +115,8 @@ aarch64-unknown-linux-musl
 - LICENSE
 - CHANGELOG
 - user documentation
-- shell completion，后续阶段
-- man page，后续阶段
+- bash/zsh/fish shell completion
+- man page
 
 不得把测试 fixture、构建缓存、私有配置或开发者本机路径打进发布包。
 
@@ -143,9 +153,8 @@ CI 和包构建能力完成时，必须满足：
 
 1. GitHub Actions 在 GitHub 镜像仓库可见。
 2. `ci.yml` 能运行 fmt、clippy、test。
-3. `package.yml` 能构建 tarball。
+3. `package.yml` 能构建 tarball、`.deb` 与 `.rpm`。
 4. workflow artifacts 可下载。
 5. artifact 有 checksum。
 6. 文档说明如何触发 workflow。
 7. TODO、MILESTONES、CHANGELOG 已更新。
-

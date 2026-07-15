@@ -10,4 +10,5 @@ publish = false
 
 [dependencies]
 persist-core = { path = "../persist-core" }
+libc = "0.2"
 

@@ -1,0 +1,83 @@
+#compdef persist
+
+_persist_session_ids() {
+    local -a ids
+    ids=(${(f)"$(command persist ls 2>/dev/null | awk 'NR > 1 && $1 ~ /^[0-9]+$/ {print $1}')"})
+    (( $#ids )) && _describe -t sessions 'session ID' ids
+}
+
+_persist() {
+    local state
+    typeset -A opt_args
+
+    _arguments -C \
+        '1:command:->command' \
+        '*::argument:->argument'
+
+    case $state in
+        command)
+            _values 'persist command' \
+                '-h:show help' '--help:show help' '-V:show version' '--version:show version' \
+                'help:show help' 'version:show version' 'doctor:diagnose local setup' \
+                'config:show configuration' 'daemon:manage daemon' 'new:create session' \
+                'ls:list sessions' 'ps:show process tree' 'stats:show process counters' \
+                'snapshot:show session snapshot' 'metrics:show metrics' 'attach:attach session' \
+                'close:close session' 'kill:terminate session' 'log:read logs' \
+                'rename:rename session' 'detach:detach client' 'note:manage note' \
+                'tag:manage tags' 'pin:pin session' 'unpin:unpin session' \
+                'lock:lock session' 'unlock:unlock session' 'replay:replay output' \
+                'install:install SSH hook' 'uninstall:remove SSH hook'
+            ;;
+        argument)
+            case $words[2] in
+                config) _arguments '1:action:(show)' ;;
+                daemon) _arguments '1:action:(start stop status)' ;;
+                ls) _arguments '(-t --tag)'{-t,--tag}'[filter by tag]:tag:' ;;
+                attach)
+                    _arguments '(-r --readonly)'{-r,--readonly}'[readonly attach]' \
+                        '1:session ID:_persist_session_ids'
+                    ;;
+                ps|stats|snapshot|close|kill|detach|pin|unpin|lock|unlock)
+                    _arguments '1:session ID:_persist_session_ids'
+                    ;;
+                rename) _arguments '1:session ID:_persist_session_ids' '2:name:' ;;
+                note) _arguments '1:session ID:_persist_session_ids' '2:note text:' ;;
+                tag)
+                    _arguments '1:session ID:_persist_session_ids' \
+                        '2:action:(add remove list)' '3:tag:'
+                    ;;
+                replay)
+                    _arguments '1:session ID:_persist_session_ids' \
+                        '(-t --tail)'{-t,--tail}'[last lines]:count:' \
+                        '(-h --head)'{-h,--head}'[first lines]:count:' \
+                        '(-s --speed)'{-s,--speed}'[replay factor]:factor:' \
+                        '(-f --follow)'{-f,--follow}'[follow output]'
+                    ;;
+                log)
+                    case $words[3] in
+                        export)
+                            _arguments '1:session ID:_persist_session_ids' \
+                                '(-o --output)'{-o,--output}'[output file]:file:_files'
+                            ;;
+                        search)
+                            _arguments '1:keyword:' \
+                                '(-s --session)'{-s,--session}'[session ID]:session ID:_persist_session_ids' \
+                                '(-i --ignore-case)'{-i,--ignore-case}'[ignore case]'
+                            ;;
+                        *)
+                            if (( CURRENT == 3 )); then
+                                _alternative 'session ID:_persist_session_ids' \
+                                    'action:_values "log action" export search'
+                            else
+                                _arguments '1:session ID:_persist_session_ids'
+                            fi
+                            ;;
+                    esac
+                    ;;
+                uninstall) _arguments '1:option:(--purge)' ;;
+            esac
+            ;;
+    esac
+}
+
+_persist "$@"

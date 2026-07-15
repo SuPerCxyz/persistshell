@@ -6,7 +6,7 @@ PersistShell 是一个 Linux 持久交互式 Shell 运行时。
 
 它让 Shell 生命周期独立于 SSH 连接。
 
-SSH 断开后，Shell 和任务继续运行。
+SSH 断开只会 detach client；daemon 仍存活时，Shell 和任务继续运行。
 
 ---
 
@@ -53,19 +53,15 @@ persist attach <id>
 
 ## SSH 断开后任务真的不会停吗？
 
-目标是不会停。
+只要 PersistShell daemon 仍然运行，Session 的 PTY 和 Shell 会继续存在。
 
-只要 PersistShell daemon 仍然运行，Session 的 PTY 和 Shell 就继续存在。
-
-注意：
-
-Phase 1 不承诺 daemon 崩溃后仍能恢复。
+daemon 崩溃后的 PTY 恢复不受保证，见 `docs/known/LIMITATIONS.md`。
 
 ---
 
 ## daemon 崩溃会怎样？
 
-Phase 1 中，daemon 持有 PTY master fd。
+daemon 持有 PTY master fd。
 
 如果 daemon 崩溃，PTY fd 可能关闭，Session 可能丢失。
 
@@ -98,11 +94,13 @@ ssh node command
 PERSIST_DISABLE=1 ssh node
 ```
 
-或：
+---
 
-```bash
-SH_DISABLE=1 ssh node
-```
+## exit 或 Ctrl+D 后还能回到 Session 吗？
+
+可以。自然退出会释放 shell runtime，但保留 Session metadata、输出、cwd、受限启动环境和
+exit code。之后 `persist attach <id>` 会创建新的可写 PTY；只恢复 `TERM`、`COLORTERM`、
+`LANG` 与 `LC_*`，Shell 运行期间动态 export 的变量不保证恢复。
 
 ---
 
@@ -130,16 +128,17 @@ persist uninstall --purge
 
 ---
 
+## SSH agent 会传给 Session 吗？
+
+会。启动时仅当 `SSH_AUTH_SOCK` 是绝对 Unix socket 路径时才传入 Shell；普通文件、相对路径
+或失效路径会被忽略。不会把该路径写入 snapshot。
+
+---
+
 ## 支持哪些 Shell？
 
-目标支持：
-
-- bash
-- zsh
-- fish
-- sh
-
-Phase 1 至少应支持 bash。
+当前 M45 基线已验证 bash、zsh、fish 的基础 Session 创建、列表和关闭；未验证的发行版、
+终端和复杂 shell 插件不能据此推断为已支持。
 
 ---
 
@@ -155,7 +154,8 @@ Phase 1 至少应支持 bash。
 
 支持从另一台电脑 attach 到已有 Session 并继续操作。
 
-默认策略应是单 active writer：同一时刻只有一个客户端向 PTY 写入，避免两个终端输入交错。新的客户端可以请求接管写入权，旧客户端会被降级、detach 或收到明确提示。
+同一时刻只有一个 active writer 向 PTY 写入，避免两个终端输入交错。新的可写客户端 attach
+后会撤销旧 writer 的写入权；旧客户端不会继续向 PTY 写入。
 
 只读 attach 可以作为可选模式，但不能作为另一台电脑进入会话的唯一方式。
 
@@ -165,7 +165,7 @@ Phase 1 至少应支持 bash。
 
 可以作为当前登录用户使用。
 
-Phase 1 不做复杂 root attach 其他用户 Session 的权限模型。
+Session 由 per-user daemon 管理，不支持 root 跨用户 attach。
 
 ---
 

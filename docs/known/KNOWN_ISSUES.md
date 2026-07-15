@@ -8,7 +8,8 @@
 
 ## 当前阶段
 
-项目仍处于设计和初始化阶段，尚未实现代码。
+Rust runtime、发布包、man page 和 shell completion 已实现并完成定向验证。当前处于 Phase 4
+文档完善阶段；本文件只记录仍未修复的实际限制或可用性问题。
 
 ---
 
@@ -103,3 +104,52 @@ Ring Buffer 字节回放不一定能完美恢复屏幕状态。
 - 必须支持 uninstall。
 - install 必须备份。
 - hook 必须保守。
+
+---
+
+## KI-0005：`persistd foreground --help` 会启动 daemon
+
+状态：
+
+```text
+已知可用性问题
+```
+
+说明：
+
+`persistd` 当前只在顶层解析 `help` 或 `--help`。`foreground --help` 会被当成
+foreground 启动命令，而不是子命令帮助。
+
+临时做法：
+
+```bash
+persistd help
+```
+
+处理计划：
+
+- 后续 CLI 可用性任务中支持子命令帮助。
+
+---
+
+## KI-0006：安装器不备份 profile，且不读取 SSH 配置字段
+
+状态：
+
+```text
+已知可用性问题
+```
+
+说明：
+
+`persist install` 当前直接向 bash/zsh profile 追加 hook，不创建备份。生成的 hook 固定使用
+`PERSIST_DISABLE`，不读取 `ssh.auto_hook` 或 `ssh.bypass_env` 配置字段。
+
+临时做法：
+
+- 首次安装前手动备份对应 profile。
+- 使用 `PERSIST_DISABLE=1 ssh host` 绕过已安装 hook。
+
+处理计划：
+
+- 后续安装器任务中增加备份、fish profile 支持和配置字段接入。

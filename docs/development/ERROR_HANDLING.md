@@ -49,43 +49,70 @@ PersistShell 是系统工具，错误提示不能只面向开发者。
 
 ## 错误码
 
-错误应有稳定错误码。
+错误有稳定错误码。
 
-示例：
+当前定义的错误码（`ErrorCode` 枚举）：
 
-```text
-E_DAEMON_NOT_RUNNING
-E_SOCKET_PERMISSION
-E_SESSION_NOT_FOUND
-E_SESSION_BUSY
-E_PTY_OPEN_FAILED
-E_FORK_FAILED
-E_EXEC_FAILED
-E_METADATA_OPEN_FAILED
-E_CONFIG_INVALID
-E_UNSUPPORTED_ENVIRONMENT
-E_PROTOCOL_VERSION
-E_INTERNAL
-```
+| 错误码 | 说明 | 分类 | 退出码 |
+|---|---|---|---|
+| `E_INVALID_ARGUMENT` | 无效参数 | UserError | 1 |
+| `E_UNKNOWN_COMMAND` | 未知命令 | UserError | 1 |
+| `E_CONFIG_PARSE` | 配置解析错误 | EnvironmentError | 2 |
+| `E_CONFIG_READ` | 配置读取失败 | EnvironmentError | 2 |
+| `E_CONFIG_INVALID` | 配置校验失败 | UserError | 1 |
+| `E_MISSING_ENVIRONMENT` | 缺少环境变量 | EnvironmentError | 2 |
+| `E_UNSUPPORTED_ENVIRONMENT` | 不支持的环境 | EnvironmentError | 2 |
+| `E_DAEMON_NOT_RUNNING` | Daemon 未运行 | EnvironmentError | 2 |
+| `E_DAEMON_ALREADY_RUNNING` | Daemon 已运行 | UserError | 1 |
+| `E_SOCKET_PERMISSION` | Socket 权限错误 | EnvironmentError | 2 |
+| `E_SOCKET_MISSING` | Socket 不存在 | EnvironmentError | 2 |
+| `E_SESSION_NOT_FOUND` | Session 不存在 | UserError | 1 |
+| `E_SESSION_BUSY` | Session 忙碌 | UserError | 1 |
+| `E_PTY_OPEN_FAILED` | PTY 打开失败 | SyscallError | 3 |
+| `E_FORK_FAILED` | Fork 失败 | SyscallError | 3 |
+| `E_EXEC_FAILED` | Exec 失败 | SyscallError | 3 |
+| `E_IOCTL_FAILED` | Ioctl 失败 | SyscallError | 3 |
+| `E_METADATA_OPEN_FAILED` | Metadata 打开失败 | EnvironmentError | 2 |
+| `E_METADATA_CORRUPT` | Metadata 损坏 | InternalError | 5 |
+| `E_PROTOCOL_VERSION` | 协议版本不匹配 | ProtocolError | 4 |
+| `E_INVALID_FRAME` | 无效协议帧 | ProtocolError | 4 |
+| `E_REQUEST_TIMEOUT` | 请求超时 | ProtocolError | 4 |
+| `E_LOG_CONFIG` | 日志配置错误 | InternalError | 5 |
+| `E_LOG_INIT` | 日志初始化失败 | EnvironmentError | 2 |
+| `E_LOGGER_STATE` | 日志状态错误 | InternalError | 5 |
+| `E_LOG_WRITE` | 日志写入失败 | EnvironmentError | 2 |
+| `E_INTERNAL` | 内部错误 | InternalError | 5 |
+| `E_NOT_IMPLEMENTED` | 未实现功能 | InternalError | 5 |
+| `E_IO` | I/O 操作失败 | SyscallError | 3 |
 
 ---
 
-## 错误分类
+## 错误分类与退出码
 
-### 用户错误
+`ErrorKind` 枚举定义了五种错误分类。每个分类有对应的退出码：
+
+| 分类 | 退出码 | 说明 |
+|---|---|---|
+| `UserError` | 1 | 用户输入错误，需要用户修正 |
+| `EnvironmentError` | 2 | 环境问题，可执行 `persist doctor` 诊断 |
+| `SyscallError` | 3 | 系统调用失败，需检查系统资源 |
+| `ProtocolError` | 4 | 协议版本或帧错误 |
+| `InternalError` | 5 | 内部错误，需报告 bug |
+
+### 用户错误 (Exit Code 1)
 
 例如：
 
-- session id 不存在
 - 命令参数错误
 - 配置格式错误
+- session id 不存在
 - attach 已退出 Session
 
 应给出修复建议。
 
 ---
 
-### 环境错误
+### 环境错误 (Exit Code 2)
 
 例如：
 
@@ -103,7 +130,7 @@ persist doctor
 
 ---
 
-### 系统调用错误
+### 系统调用错误 (Exit Code 3)
 
 例如：
 
@@ -118,7 +145,7 @@ persist doctor
 
 ---
 
-### 协议错误
+### 协议错误 (Exit Code 4)
 
 例如：
 
@@ -131,11 +158,97 @@ persist doctor
 
 ---
 
-### 内部错误
+### 内部错误 (Exit Code 5)
 
 内部错误应尽量少。
 
 如果出现，必须记录详细上下文，并提示用户提交 issue。
+
+---
+
+## 用户可见输出格式
+
+`PersistError::user_facing(app)` 方法生成统一的用户可见错误信息。
+
+格式：
+
+```text
+{app}: {ERROR_CODE} - {详细错误信息}
+建议: {修复建议}
+请报告此问题: https://github.com/SuPerCxyz/persistshell/issues   # 仅 InternalError
+```
+
+示例：
+
+```text
+persist: E_INVALID_ARGUMENT - invalid argument: unknown persist command: wat
+建议: 执行 persist help 查看命令用法
+```
+
+内部错误会附加 GitHub issue 链接。
+
+---
+
+## 代码 API
+
+### ErrorCode
+
+```rust
+pub enum ErrorCode {
+    InvalidArgument,
+    UnknownCommand,
+    ConfigParse,
+    ConfigRead,
+    ConfigInvalid,
+    MissingEnvironment,
+    UnsupportedEnvironment,
+    DaemonNotRunning,
+    DaemonAlreadyRunning,
+    SocketPermission,
+    SocketMissing,
+    SessionNotFound,
+    SessionBusy,
+    PtyOpenFailed,
+    ForkFailed,
+    ExecFailed,
+    IoctlFailed,
+    MetadataOpenFailed,
+    MetadataCorrupt,
+    ProtocolVersion,
+    InvalidFrame,
+    RequestTimeout,
+    LogConfig,
+    LogInit,
+    LoggerState,
+    LogWrite,
+    Internal,
+    NotImplemented,
+    Io,
+}
+```
+
+### ErrorKind
+
+```rust
+pub enum ErrorKind {
+    UserError,       // exit code 1
+    EnvironmentError, // exit code 2
+    SyscallError,     // exit code 3
+    ProtocolError,    // exit code 4
+    InternalError,    // exit code 5
+}
+```
+
+### PersistError
+
+```rust
+// 每个错误变体可通过以下方法查询：
+error.code()      // -> ErrorCode
+error.kind()      // -> ErrorKind
+error.exit_code() // -> u8
+error.user_facing(app)  // -> String
+error.suggestion()      // -> Option<&'static str>
+```
 
 ---
 

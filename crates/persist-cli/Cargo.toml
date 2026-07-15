@@ -13,5 +13,7 @@ name = "persist"
 path = "src/main.rs"
 
 [dependencies]
+serde_json.workspace = true
 persist-core = { path = "../persist-core" }
-
+persist-ipc = { path = "../persist-ipc" }
+libc = "0.2"

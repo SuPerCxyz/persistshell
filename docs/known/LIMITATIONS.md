@@ -76,23 +76,27 @@ Phase 1 默认只记录输出，不记录输入。
 
 ---
 
-### Read-only Attach 暂不支持
+### 多 writer 同时输入不支持
 
-Phase 1 可以暂不实现只读查看模式。
-
----
-
-### 多 active writer 暂不支持
-
-Phase 1 默认只允许一个 active writer，避免两个终端同时写入同一 PTY。
-
-但另一台电脑必须可以 attach 到已有 Session 并请求可写接管，不能只能以只读方式进入。
+M35 支持另一台电脑接管写权限，但同一 Session 同一时刻仍只允许一个
+active writer。新 writer attach 后会立即撤销旧 writer，避免两个终端的输入交错。
 
 ---
 
-### SSH Agent 同步暂不支持
+### SSH Agent 仅在 PTY 启动时继承
 
-`SSH_AUTH_SOCK` 动态同步放到后续版本。
+M40 会在创建 PTY 时继承 `SSH_AUTH_SOCK`，但只接受当前用户环境中的绝对 Unix socket 路径；
+普通文件、相对路径和失效路径会被忽略。
+
+Session 已启动后不会动态跟踪 `SSH_AUTH_SOCK` 的变化；重新 attach 或修改环境不能替换已启动
+Shell 的 agent socket。
+
+---
+
+### Closed Session 环境变量范围
+
+M14 只恢复 Shell 启动时继承的受限环境快照：`TERM`、`COLORTERM`、`LANG` 与
+`LC_*`。Shell 运行期间通过 `export`、脚本或插件动态修改的环境变量不保证可恢复。
 
 ---
 

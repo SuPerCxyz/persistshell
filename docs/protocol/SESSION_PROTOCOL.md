@@ -174,6 +174,33 @@ ERR_SESSION_BUSY
 
 `--read-only` 只能是可选查看模式，不能替代跨电脑可写进入会话的能力。
 
+### M35 writer 交接
+
+M35 使用通知后立即交接的单 writer 模型。新的 read-write attach
+请求到达时，Daemon 必须：
+
+1. 向当前 writer 发送 `WRITE_REVOKED` 通知。
+2. 在同一状态转换中将 active writer 变更为新 client。
+3. 向新 client 发送 `WRITE_GRANTED`，随后允许 `STDIN` 和 `RESIZE`。
+4. 忽略旧 client 在收到通知后发送的延迟 `DETACH`，不得释放新 writer。
+
+交接不等待旧 client 主动确认，避免断连或挂起的旧 SSH client 长时间阻塞
+另一台电脑继续操作。旧 client 收到通知后退出 raw mode 并回到普通 shell。
+
+控制消息的 payload 均为网络字节序的 `u32 session_id`：
+
+```text
+WRITE_REQUEST  client 请求该 Session 的写权限
+WRITE_GRANTED  daemon 已授予该 client 写权限
+WRITE_REVOKED  daemon 已撤销该 client 的写权限
+```
+
+### M36 Session Lock
+
+`LOCK_SET` 使用 `session_id` 和布尔值更新持久化锁定状态。锁定 Session
+必须拒绝 attach 和 kill，Idle GC 必须跳过该 Session；仅 `LOCK_SET(false)`
+可以解除保护。列表响应以独立 flag 标记锁定状态。
+
 ---
 
 ## Detach Session

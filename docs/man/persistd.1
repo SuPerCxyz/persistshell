@@ -1,0 +1,61 @@
+.TH PERSISTD 1 "2026-07-15" "PersistShell 0.1.0" "User Commands"
+.SH NAME
+persistd \- run the PersistShell per-user daemon
+.SH SYNOPSIS
+.B persistd
+.RI [ help | version ]
+.br
+.B persistd foreground
+.RI [ --idle-timeout " " DURATION ]
+.SH DESCRIPTION
+.B persistd
+owns the per-user Unix socket, PTY sessions, session metadata, ring buffers,
+and output logs.  Normally it is started by \fBpersist daemon start\fR.
+Run it directly only for foreground operation and diagnostics.
+.SH COMMANDS
+.TP
+.B help
+Show daemon help.  Use this form instead of appending \fB--help\fR to
+\fBforeground\fR.
+.TP
+.B version
+Show the daemon version.
+.TP
+.B foreground [\fB--idle-timeout\fR \fIDURATION\fR]
+Run the daemon in the foreground.  \fIDURATION\fR accepts the configured
+duration syntax, such as \fB30s\fR, \fB5m\fR, or \fB1h\fR.  When nonzero, the
+daemon periodically removes idle, unlocked, unattached sessions.
+.SH RUNTIME
+The daemon holds a single-instance PID lock in
+.IR /run/user/$UID/persistshell/daemon.pid
+and listens on
+.IR /run/user/$UID/persistshell/persist.sock
+by default.  It uses the same configuration and XDG directory resolution as
+.BR persist (1).
+.SH SIGNALS
+.B SIGTERM
+requests a graceful shutdown.  The daemon removes its socket and PID file
+when its foreground loop exits.
+.SH FILES
+.TP
+.I ~/.config/persistshell/config.toml
+User configuration.
+.TP
+.I ~/.local/share/persistshell/metadata.db
+Persistent session metadata.
+.TP
+.I ~/.local/share/persistshell/sessions/
+Session output logs by default.
+.TP
+.I ~/.local/state/persistshell/daemon.log
+Daemon log by default.
+.SH EXIT STATUS
+Zero indicates success.  Invalid arguments and daemon startup or runtime
+errors exit with status 2.
+.SH SECURITY
+The daemon is per-user.  Its runtime directory is mode 0700 and its socket,
+logs, and metadata are restricted to the owning user.  Do not expose the
+runtime directory to other users.
+.SH SEE ALSO
+.BR persist (1),
+.I /usr/share/doc/persistshell/CONFIG.md

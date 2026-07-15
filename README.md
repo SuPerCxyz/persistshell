@@ -273,11 +273,13 @@ GitHub Actions 必须支持：
 
 - Rust fmt / clippy / test。
 - Linux release tarball 构建。
-- 后续 `.deb` 和 `.rpm` 包构建。
+- Debian `.deb` 和 RPM `.rpm` 包构建。
 - release artifact 上传。
 - SHA256 checksum 生成。
 
 GitHub Actions workflow 不应依赖自建 Git 服务、开发者本机路径或私有 SSH 配置。
+workflow 定义已就绪；实际 GitHub hosted runner 的执行需要镜像仓库同步后触发，当前没有
+将其伪报为已运行。
 
 ---
 
@@ -369,21 +371,18 @@ PersistShell 必须遵守最小权限原则。
 
 ## 当前状态
 
-PersistShell 当前处于设计和项目初始化阶段。
+PersistShell 已有可运行的 Rust CLI、per-user daemon、PTY Session、SQLite metadata、日志、
+Closed Session 恢复、单 active writer、观察命令、man page、bash/zsh/fish completion 以及
+tarball/deb/rpm 打包入口。验证记录位于 `docs/audit/`；当前已知限制位于
+`docs/known/`。
 
-在开始编码之前，必须先建立完整的文档、路线图、开发规范和架构约束。
+开发或自动化 Agent 的阅读入口为 `docs/INDEX.md`，当前唯一开发任务以 `NEXT_TASK.md` 为准。
 
-任何大模型或开发者参与本项目时，必须先阅读：
+---
 
-1. PROJECT_PRINCIPLES.md
-2. PRODUCT_PHILOSOPHY.md
-3. NON_GOALS.md
-4. ROADMAP.md
-5. MILESTONES.md
-6. NEXT_TASK.md
-7. TODO.md
+## License
 
-然后只完成 NEXT_TASK.md 中指定的唯一任务。
+PersistShell is distributed under the MIT License.  See `LICENSE`.
 
 ---
 

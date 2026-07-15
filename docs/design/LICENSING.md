@@ -4,9 +4,8 @@
 
 ## Current Decision
 
-当前仓库没有选择具体开源许可证，因此不应把本仓库视为已经正式开源发布。
-
-在维护者明确选择许可证之前，不创建根目录 `LICENSE` 文件，不在 README 中声明 MIT、Apache-2.0、GPL 或其他许可证。
+本仓库使用根目录 `LICENSE` 中的 MIT License。Cargo workspace 通过 `license-file = "LICENSE"`
+引用该文件；发布包必须携带同一份许可证文本。
 
 ## Why This Matters
 
@@ -21,7 +20,8 @@ PersistShell 属于 Linux 基础设施类软件，后续可能涉及：
 - 专利授权边界
 - 依赖许可证兼容
 
-因此许可证必须由项目维护者明确选择，而不是由实现 Agent 自动决定。
+许可证已由维护者写入仓库。后续如需更换许可证，必须由维护者明确决策，不能由实现 Agent
+自行替换。
 
 ## Recommended Options
 
@@ -56,16 +56,14 @@ PersistShell 属于 Linux 基础设施类软件，后续可能涉及：
 
 ## Release Rule
 
-在任何公开发布、打包、接受外部贡献或创建 release artifact 之前，必须完成以下事项：
+在任何公开 release 前，必须完成以下事项：
 
-1. 维护者选择许可证。
-2. 创建根目录 `LICENSE` 文件。
-3. 更新 `README.md` 的许可证说明。
-4. 检查依赖许可证兼容性。
-5. 在 `CHANGELOG.md` 记录许可证选择。
-6. 如需要，补充 `NOTICE` 文件。
+1. 确认根目录 `LICENSE` 仍为维护者认可的 MIT License。
+2. 确认 README 和发布包包含许可证说明与文本。
+3. 检查依赖许可证兼容性。
+4. 在 `CHANGELOG.md` 记录任何许可证变更。
+5. 如需要，补充 `NOTICE` 文件。
 
 ## Non-Decision
 
-本文档不是许可证本身，也不授予任何使用、复制、修改、分发本仓库内容的权利。
-
+本文档不是许可证本身；权利和限制以根目录 `LICENSE` 为准。

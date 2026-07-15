@@ -287,6 +287,21 @@ client_count
 exit_code
 ```
 
+M37 的列表响应额外提供运行中 Session 的 `foreground_pid`、`foreground_name` 和
+`foreground_cmd`。无前台进程或 `/proc` 不可读时三个字段为空。
+
+M38 使用 `PROCESS_TREE` 请求，payload 为 Session ID；`PROCESS_TREE_RESP` 返回有界
+前台进程树节点列表，每个节点包含 pid、parent_pid、depth、name 与 command。
+
+M41 使用 `SESSION_SNAPSHOT` 请求，payload 为 Session ID；
+`SESSION_SNAPSHOT_RESP` 返回最多 16 KiB 的 JSON。响应包含 metadata 摘要、
+writer 是否活跃、输出日志路径与前台进程摘要；不包含环境变量、输入、SSH agent 路径或
+note/tag 内容。未知 Session 和超出上限通过 JSON 的 `error` 字段返回。
+
+M42 使用无 payload 的 `METRICS` 请求；`METRICS_RESP` 返回最多 16 KiB 的 JSON，
+包含 daemon PID 和 Session 聚合计数。它不启动 metrics server 或后台采样；metadata
+不可用和超限通过 JSON 的 `error` 字段返回。
+
 ---
 
 ## Resize 流程

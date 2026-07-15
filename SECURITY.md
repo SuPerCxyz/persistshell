@@ -26,6 +26,9 @@ metadata:    0600
 logs:        0600
 ```
 
+`persist daemon start` 创建的 runtime `daemon.log` 会显式设置为 `0600`，不得依赖当前
+umask。
+
 ---
 
 ## 不记录用户输入

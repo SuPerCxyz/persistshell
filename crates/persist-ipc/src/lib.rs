@@ -3,4 +3,23 @@
 pub mod protocol;
 pub mod socket;
 
-pub use protocol::{ProtocolVersion, RequestKind};
+pub use protocol::{
+    decode_attach, decode_attach_resp, decode_detach, decode_hello, decode_hello_ack,
+    decode_list_sessions_resp, decode_lock, decode_new_session_resp, decode_note,
+    decode_note_get_resp, decode_op_resp, decode_pin, decode_process_stats_resp,
+    decode_process_tree_resp, decode_rename, decode_resize, decode_session_exited, decode_signal,
+    decode_tag, decode_tag_list_resp, decode_writer_control, encode_attach, encode_attach_resp,
+    encode_detach, encode_hello, encode_hello_ack, encode_list_sessions_resp, encode_lock,
+    encode_new_session_resp, encode_note, encode_note_get_resp, encode_op_resp, encode_pin,
+    encode_process_stats_resp, encode_process_tree_resp, encode_rename, encode_resize,
+    encode_session_exited, encode_signal, encode_tag, encode_tag_list_resp, encode_writer_control,
+    read_frame, write_frame, AttachPayload, AttachRespPayload, DetachPayload, Frame,
+    FrameAccumulator, HelloAckPayload, HelloPayload, HelloStatus, ListSessionsRespPayload,
+    LockPayload, MessageType, NewSessionRespPayload, NotePayload, OpRespPayload, PinPayload,
+    ProcessStatsRespPayload, ProcessTreeNode, ProcessTreeRespPayload, RenamePayload, ResizePayload,
+    SessionEntry, SessionExitedPayload, SignalPayload, TagListRespPayload, TagPayload,
+    WriterControlPayload, HEADER_SIZE, MAX_CONTROL_FRAME, MAX_IO_FRAME,
+};
+pub use socket::{
+    check_socket_path, cleanup_stale_socket, ClientSocket, DaemonConnection, DaemonSocket,
+};

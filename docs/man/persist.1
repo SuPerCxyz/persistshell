@@ -1,0 +1,138 @@
+.TH PERSIST 1 "2026-07-15" "PersistShell 0.1.0" "User Commands"
+.SH NAME
+persist \- manage persistent interactive shell sessions
+.SH SYNOPSIS
+.B persist
+.RI [ help ]
+.br
+.B persist
+.I command
+.RI [ arguments ]
+.SH DESCRIPTION
+.B persist
+is the PersistShell client.  It connects to the per-user
+.BR persistd (1)
+daemon over a Unix socket and manages interactive shell sessions.
+The shell runtime is released when the shell exits; persisted metadata,
+output, working directory, and the restricted recovery environment remain
+available for a later recovery attach.
+.SH COMMANDS
+.TP
+.B help
+Show command help.  This is also the behavior with no arguments.
+.TP
+.B version
+Show the client version.
+.TP
+.B doctor
+Check local configuration and runtime prerequisites.
+.TP
+.B config [show]
+Print the effective configuration.
+.TP
+.B daemon {start|stop|status}
+Start, stop, or report the per-user daemon.
+.TP
+.B new
+Create a session without attaching to it.
+.TP
+.B attach [\fIID\fR] [\fB-r\fR|\fB--readonly\fR]
+Attach to an existing session.  Without an ID, create and attach to a new
+session.  A writable attach takes the active writer role from any prior
+writer; readonly attaches receive output but cannot send input.
+.TP
+.B ls [\fB-t\fR|\fB--tag\fR \fITAG\fR]
+List sessions, optionally restricted to one tag.
+.TP
+.B ps \fIID\fR
+Show the foreground process tree for a session.
+.TP
+.B stats \fIID\fR
+Show resource counters for the foreground process.
+.TP
+.B snapshot \fIID\fR
+Print a bounded JSON snapshot that excludes environment values, input, note
+text, tag text, and SSH agent paths.
+.TP
+.B metrics
+Print bounded daemon and session aggregate metrics as JSON.
+.TP
+.B close \fIID\fR
+Close a session gracefully.
+.TP
+.B kill \fIID\fR
+Terminate a session.
+.TP
+.B detach \fIID\fR
+Disconnect the active client from a session.
+.TP
+.B log \fIID\fR
+Print a session output log.
+.TP
+.B log export \fIID\fR [\fB-o\fR|\fB--output\fR \fIPATH\fR]
+Export a session output log to standard output or a file.
+.TP
+.B log search \fIKEYWORD\fR [\fB-s\fR|\fB--session\fR \fIID\fR] [\fB-i\fR|\fB--ignore-case\fR]
+Search session logs.
+.TP
+.B replay \fIID\fR [\fB-t\fR|\fB--tail\fR \fIN\fR] [\fB-h\fR|\fB--head\fR \fIN\fR] [\fB-s\fR|\fB--speed\fR \fIFACTOR\fR] [\fB-f\fR|\fB--follow\fR]
+Replay recorded output.
+.TP
+.B rename \fIID\fR \fINAME\fR
+Rename a session.
+.TP
+.B note \fIID\fR [\fITEXT\fR]
+Read a note, set it, or clear it with an empty text argument.
+.TP
+.B tag \fIID\fR {add|remove|list} [\fITAG\fR]
+Manage session tags.
+.TP
+.B pin|\fBunpin|\fBlock|\fBunlock \fIID\fR
+Change a session's pin or lock state.  A locked session rejects attach and
+kill until it is unlocked.
+.TP
+.B install
+Install the interactive SSH shell hook.
+.TP
+.B uninstall [\fB--purge\fR]
+Remove the shell hook.  The optional purge also removes PersistShell data.
+.SH ENVIRONMENT
+.TP
+.B PERSIST_DISABLE
+When nonempty, the installed SSH hook bypasses PersistShell.
+.TP
+.BR HOME ,
+.BR XDG_CONFIG_HOME ,
+.BR XDG_DATA_HOME ,
+.BR XDG_STATE_HOME ,
+.BR XDG_RUNTIME_DIR
+Set the per-user configuration, data, state, and runtime locations.
+.SH FILES
+.TP
+.I ~/.config/persistshell/config.toml
+User configuration.
+.TP
+.I /etc/persistshell/config.toml
+System configuration.
+.TP
+.I ~/.local/share/persistshell/
+Metadata, session output, and history by default.
+.TP
+.I ~/.local/state/persistshell/
+Client and daemon logs by default.
+.TP
+.I /run/user/$UID/persistshell/persist.sock
+Default per-user daemon socket.
+.SH EXIT STATUS
+Zero indicates success.  The client uses 1 for invalid user input, 2 for
+environment or configuration failures, 3 for I/O or system call failures, 4
+for protocol failures, and 5 for internal failures.
+.SH SECURITY
+The socket and runtime directory are per-user.  PersistShell does not record
+terminal input by default.  Output can still contain secrets printed by
+programs.  Use \fBPERSIST_DISABLE=1 ssh host\fR or
+\fBssh host 'bash --noprofile --norc'\fR to bypass the shell hook.
+.SH SEE ALSO
+.BR persistd (1),
+.I /usr/share/doc/persistshell/COMMANDS.md,
+.I /usr/share/doc/persistshell/CONFIG.md

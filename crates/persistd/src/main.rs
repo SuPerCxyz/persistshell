@@ -1,3 +1,5 @@
+mod lifecycle;
+mod log_writer;
 mod server;
 
 fn main() -> std::process::ExitCode {

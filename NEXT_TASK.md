@@ -10,61 +10,46 @@
 
 ## 当前阶段
 
-Phase 1：MVP Core
+Phase 4：发布和长期维护
 
 ---
 
 ## 当前里程碑
 
-M04：错误处理框架
+M50：v1.0 Release Readiness
 
 ---
 
 ## 当前唯一任务
 
-完善 PersistShell 统一错误处理框架。
+在维护者明确授权后，执行与最终版本一致的 tag、远端同步和 GitHub 发布流程。
 
-本任务应在现有 Rust workspace 上继续推进，不实现 PTY、daemon runtime、IPC streaming、Session 输出日志或 SSH 自动接管。
+### 前置已完成
+
+- M49 已完成用户文档、FAQ、故障排查与三种包文档验证。
+- M50 本地/test 发布就绪检查、release checklist 与审计记录已完成。
+- 维护者已确认发布版本为 `0.1.0`，对应 tag 为 `v0.1.0`。
 
 ---
 
 ## 任务范围
 
-需要实现：
-
-- 稳定错误码定义。
-- 用户可读错误输出格式。
-- 错误分类：用户错误、环境错误、系统调用错误、协议错误、内部错误。
-- 错误到退出码的映射。
-- `persist` 和 `persistd` 的错误输出统一。
-- 配置和日志错误接入统一错误码。
-- 错误相关测试。
-- 错误处理文档同步。
+- 提交、push 并确认 GitHub mirror 同步；创建与版本一致的 tag。
+- 检查 GitHub CI/package workflow，独立复核下载 artifact 的 checksum 与内容。
+- 按维护者决定创建 GitHub Release、发布说明和可选签名。
 
 ---
 
 ## 完成标准
 
-本任务完成时必须满足：
-
-1. `cargo fmt --all -- --check` 通过。
-2. `cargo clippy --workspace --all-targets --all-features -- -D warnings` 通过。
-3. `cargo test --workspace --all-features` 通过。
-4. 错误码和错误分类有单元测试。
-5. CLI 错误输出有集成测试。
-6. `TODO.md`、`MILESTONES.md`、`CHANGELOG.md` 已更新。
-7. `NEXT_TASK.md` 更新为下一个唯一任务。
+1. 远端 tag 与最终版本一致，GitHub mirror 中的 CI/package workflow 全部成功。
+2. 下载的 release artifact 均能独立校验 checksum，内容符合 `docs/release/RELEASE_CHECKLIST.md`。
+3. GitHub Release、发布说明、签名和依赖许可证审查状态均按维护者决定记录。
+4. 公开发布后，CHANGELOG、release checklist 与审计记录补充实际 tag、日期和 workflow 证据。
 
 ---
 
 ## 禁止事项
 
-本任务期间禁止：
-
-- 实现 PTY Engine。
-- 实现真实 daemon runtime。
-- 实现 Unix Socket streaming。
-- 实现 Session 输出日志。
-- 安装 shell profile hook。
-- 修改 Session Protocol 语义。
-- 扩展 Phase 2/Phase 3 功能。
+执行前必须取得维护者对最终版本、远端推送、tag、GitHub Release 与签名策略的明确授权；未授权时
+不得执行任何远端写操作，也不得为未验证的平台、Shell 或 TUI 行为给出支持承诺。

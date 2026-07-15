@@ -75,6 +75,19 @@
 - [x] 支持打印当前配置
 - [x] 支持安全默认值
 
+### 错误处理框架
+
+- [x] 定义 ErrorCode 枚举 (29 种稳定错误码)
+- [x] 定义 ErrorKind 分类 (User/Environment/Syscall/Protocol/Internal)
+- [x] 实现 exit_code() 映射
+- [x] 实现 user_facing() 统一输出格式
+- [x] 实现 suggestion() 修复建议
+- [x] 错误码单元测试 (13 个)
+- [x] CLI 错误输出集成测试 (2 个)
+- [x] Daemon 错误输出集成测试 (2 个)
+- [x] 统一 persist 和 persistd 错误输出
+- [x] 错误处理文档同步
+
 ### 内部日志
 
 - [x] 支持内部日志配置结构与默认值
@@ -102,68 +115,89 @@
 
 ### IPC
 
-- [ ] 设计 Unix Socket 协议
-- [ ] 实现 client connect
-- [ ] 实现 request/response
-- [ ] 实现 streaming attach
-- [ ] 实现协议版本
-- [ ] 实现超时
-- [ ] 实现错误码
-- [ ] 实现 socket 权限检查
-- [ ] 实现 socket 清理
+- [x] 设计 Unix Socket 协议（SOCKET_PROTOCOL.md）
+- [x] 实现 client connect（ClientSocket::connect）
+- [x] 实现 request/response（Frame + write_frame/read_frame）
+- [x] 实现 streaming attach（M08：poll 驱动 + STDIN/STDOUT 帧转发）
+- [x] 实现 resize 帧转发（M09：SIGWINCH → RESIZE → TIOCSWINSZ）
+- [x] 实现 SIGPIPE 忽略（M09：daemon + client 两端）
+- [x] 实现协议版本（ProtocolVersion + HELLO handshake）
+- [x] 实现超时（set_stream_timeout）
+- [x] 实现错误码（ErrorPayload）
+- [x] 实现 socket 权限检查（0600 文件 / 0700 目录）
+- [x] 实现 socket 清理（Drop + cleanup）
+
+### Daemon
+
+- [x] 实现 per-user daemon
+- [x] 实现 daemon start（通过 persist CLI）
+- [x] 实现 daemon stop
+- [x] 实现 daemon status
+- [x] 实现 daemonize 后台化（PID 文件 + foreground 进程）
+- [x] 实现单实例锁（PID 文件 + flock）
+- [x] 实现优雅退出（SIGTERM → 清理 socket/PID → 退出）
+- [x] 实现 daemon 日志（使用 M03 日志框架）
+- [x] 实现 daemon 错误处理（使用 M04 错误框架）
+- [ ] 实现 daemon 崩溃提示（M06 之后）
 
 ### PTY Engine
 
-- [ ] 实现 openpty
-- [ ] 实现 fork
-- [ ] 实现 setsid
-- [ ] 实现 TIOCSCTTY
-- [ ] 实现 exec 用户默认 shell
-- [ ] 支持读取用户默认 shell
+- [x] 实现 openpty（posix_openpt + grantpt + unlockpt）
+- [x] 实现 fork
+- [x] 实现 setsid
+- [x] 实现 TIOCSCTTY
+- [x] 实现 exec 用户默认 shell
+- [x] 支持读取用户默认 shell（getpwuid_r，fallback SHELL env，fallback /bin/sh）
 - [ ] 支持 termios 初始化
 - [ ] 支持 raw mode
-- [ ] 支持 PTY master 非阻塞
-- [ ] 支持 PTY 生命周期清理
-- [ ] 支持 SIGCHLD
-- [ ] 支持 shell exit code
-- [ ] 支持 Closed Session 可恢复
-- [ ] 保存 Closed Session cwd
-- [ ] 保存 Closed Session 环境变量快照
+- [x] 支持 PTY master 非阻塞
+- [x] 支持 PTY 生命周期清理（drop 自动清理）
+- [-] 支持 SIGCHLD（M08+ — daemon io_loop 通过 PTY read 返回 0 检测 exit，当前用 poll 轮询）
+- [x] 支持 shell exit code（waitpid + WEXITSTATUS/WTERMSIG）
+- [x] 支持 Closed Session 可恢复（M14）
+- [x] 保存 Closed Session cwd（M14）
+- [x] 保存 Closed Session 环境变量快照（M14：启动环境白名单）
 
 ### I/O
 
-- [ ] 实现 client stdin 到 PTY
-- [ ] 实现 PTY output 到 client stdout
-- [ ] 实现 epoll 驱动
+- [x] 实现 client stdin 到 PTY（通过 STDIN frame → write_input）
+- [x] 实现 PTY output 到 client stdout（read_output → STDOUT frame）
+- [x] 实现 poll 驱动（io_loop 使用 poll() + FrameAccumulator）
 - [ ] 避免阻塞写
 - [ ] 慢客户端处理
 - [ ] 大输出处理
 - [ ] 输出风暴保护
-- [ ] EOF 处理
+- [x] EOF 处理（raw mode + STDIN 字节 → shell 自行处理）
 
 ### Signal
 
-- [ ] 支持 SIGINT
-- [ ] 支持 SIGQUIT
-- [ ] 支持 SIGTSTP
-- [ ] 支持 SIGWINCH
-- [ ] 支持 Ctrl+D
-- [ ] 正确处理 foreground process group
-- [ ] 正确处理终端 resize
+- [x] 支持 SIGINT（通过 raw mode + STDIN 字节 → PTY master → line discipline → 前台进程组）
+- [x] 支持 SIGQUIT（同上）
+- [x] 支持 SIGTSTP（同上）
+- [x] 支持 SIGWINCH（M09：AtomicBool flag + RESIZE 帧 + io_loop 检查）
+- [x] 支持 Ctrl+D（raw mode + STDIN 字节 → shell 自行处理）
+- [x] 正确处理 foreground process group（由 PTY 内核驱动自动完成）
+- [x] 正确处理终端 resize（M09：TIOCGWINSZ → RESIZE → TIOCSWINSZ）
+- [x] 实现 daemon 端 Signal 消息处理（转发到 PTY 前端进程组）
+- [x] 实现 client 端本地终端信号转换为 IPC Signal 消息
+- [x] 新增 IPC 消息类型 Signal/SignalResp
+- [x] SIGINT 转发集成测试
+- [x] SIGTSTP 转发集成测试
 - [ ] 测试 vim/top/less resize
 
 ### Session Manager
 
-- [ ] 创建 Session
-- [ ] Attach Session
-- [ ] Detach Session
-- [ ] Kill Session
-- [ ] Rename Session
-- [ ] List Session
+- [x] 创建 Session（NEW_SESSION → 创建 PtySession）
+- [x] Attach Session（ATTACH → 取出 PtySession → I/O 循环）
+- [x] Detach Session（DETACH → 放回 SessionManager）
+- [x] Kill Session（M10：SIGKILL + 清理）
+- [x] Close Session（M10：SIGHUP + 等待退出）
+- [x] Rename Session
+- [x] List Session（LIST_SESSIONS → 返回列表）
 - [ ] 查询 Session 详情
 - [ ] 更新 Session 状态
-- [ ] 处理 Closed Session
-- [ ] 支持 Closed Session attach 冷恢复
+- [x] 处理 Closed Session（M14：释放 runtime、保存恢复上下文并支持 attach 冷恢复）
+- [x] 支持 Closed Session attach 冷恢复（M14）
 - [ ] 处理 Zombie Session
 - [ ] 处理 Detached Session
 - [ ] Session ID 生成
@@ -172,39 +206,38 @@
 
 ### Metadata Store
 
-- [ ] 选择 SQLite 或 BoltDB
-- [ ] 定义 schema
-- [ ] 支持 schema version
-- [ ] 支持 migration
-- [ ] 存储 Session metadata
-- [ ] 存储 exit code
-- [ ] 存储 cwd
-- [ ] 存储 shell pid
-- [ ] 存储 created/active time
-- [ ] 存储 source client
-- [ ] 权限安全检查
+- [x] 选择 SQLite（bundled rusqlite）
+- [x] 定义 schema（sessions 表 + schema_version 表）
+- [x] 支持 schema version
+- [x] 支持 migration（自动 execute_batch）
+- [x] 存储 Session metadata（session_id, name, status, timestamps）
+- [x] 存储 exit code（close_session / kill_session 时记录）
+- [x] 存储 cwd（create_session 时记录）
+- [ ] 存储 shell pid（M11 范围外）
+- [x] 存储 created/active time（created_at, updated_at, closed_at）
+- [ ] 存储 source client（M11 范围外）
+- [x] 权限安全检查（DB 文件继承目录权限）
 
-### Ring Buffer
+### Ring Buffer (M12)
 
-- [ ] 实现固定大小 buffer
-- [ ] 支持循环覆盖
-- [ ] 支持 attach 回放
-- [ ] 支持配置大小
-- [ ] 支持高吞吐写入
-- [ ] 支持慢客户端丢弃策略
-- [ ] 添加 benchmark
+- [x] 实现固定大小 buffer（RingBuffer in persist-core）
+- [x] 支持循环覆盖
+- [x] 支持 attach 回放（replay before ATTACH_RESP）
+- [x] 支持配置大小（config.ring_buffer.default_size）
+- [ ] 支持慢客户端丢弃策略（M12 范围外）
+- [ ] 添加 benchmark（M12 范围外）
 
 ### Logging
 
-- [ ] 每 Session 独立日志
-- [ ] 异步写入
+- [x] 每 Session 独立日志
+- [x] 异步写入
 - [ ] 批量 flush
-- [ ] 日志轮转
+- [x] 日志轮转
 - [ ] 日志保留策略
-- [ ] 日志权限 0600
-- [ ] 支持关闭日志
+- [x] 日志权限 0600
+- [x] 支持关闭日志
 - [ ] 支持清理日志
-- [ ] 支持输出日志查看
+- [x] 支持输出日志查看
 
 ### CLI
 
@@ -214,53 +247,57 @@
 - [ ] persist daemon status
 - [ ] persist new
 - [ ] persist ls
-- [ ] persist attach
-- [ ] persist detach
-- [ ] persist kill
-- [ ] persist rename
-- [ ] persist log
+- [x] persist attach（M08：raw mode + poll 驱动 I/O）
+- [x] persist new（M10）
+- [x] persist ls（M10）
+- [x] persist close（M10）
+- [x] persist kill（M10）
+- [x] persist detach
+- [x] persist rename
+- [x] persist log
 - [ ] persist tail
-- [ ] persist doctor
-- [ ] persist install
-- [ ] persist uninstall
+- [x] persist doctor
+- [x] persist install
+- [x] persist uninstall
 - [x] persist config
 
 ### SSH 接管
 
-- [ ] 检测交互式 SSH
-- [ ] 不接管非交互命令
-- [ ] 不影响 scp
-- [ ] 不影响 sftp
-- [ ] 不影响 rsync
-- [ ] 不影响 ansible
-- [ ] 不影响 git over ssh
-- [ ] 支持 SH_DISABLE=1 绕过
+- [x] 检测交互式 SSH（hook 中 `$SSH_TTY` 检查）
+- [x] 不接管非交互命令（shell hook 只在交互式 SSH 中执行，非交互无影响）
+- [x] 不影响 scp（非交互自动绕过）
+- [x] 不影响 sftp（非交互自动绕过）
+- [x] 不影响 rsync（非交互自动绕过）
+- [x] 不影响 ansible（非交互自动绕过）
+- [x] 不影响 git over ssh（非交互自动绕过）
+- [x] 支持 PERSIST_DISABLE=1 绕过
 - [ ] 支持 uninstall 回滚
-- [ ] 支持 shell profile 注入
-- [ ] 支持 bash/zsh/fish 接入策略
+- [x] 支持 shell profile 注入（bash/zsh）
+- [x] 支持 zsh/fish PTY 集成测试
 
 ### 安装与诊断
 
-- [ ] persist install
-- [ ] persist uninstall
-- [ ] persist doctor
-- [ ] 检查 socket 权限
-- [ ] 检查 daemon 状态
+- [x] persist install
+- [x] persist uninstall
+- [x] persist doctor
+- [x] 检查 socket 权限
+- [x] 检查 daemon 状态
 - [ ] 检查 profile 注入
-- [ ] 检查日志目录权限
+- [x] 检查日志目录权限
 - [ ] 检查 metadata 权限
-- [ ] 输出修复建议
+- [x] 输出修复建议
 
 ### 测试
 
-- [ ] 单元测试
-- [ ] 集成测试
-- [ ] PTY 测试
-- [ ] Signal 测试
+- [x] 单元测试
+- [x] PTY 集成测试（echo/pipe/多命令/重定向/zsh/fish）
+- [x] CLI 集成测试（daemon-required 命令连接错误输出）
+- [x] Daemon IPC 集成测试（note/tag 完整流程）
+- [ ] Signal 集成测试（M22）
 - [ ] SSH 接管测试
-- [ ] 非交互兼容测试
-- [ ] 大输出测试
-- [ ] 多 Session 测试
+- [x] 大输出测试（M21）
+- [x] 多 Session 测试（M21）
+- [x] 频繁 attach/detach 测试（M21）
 - [ ] 断线恢复测试
 - [ ] vim/top/less 兼容测试
 
@@ -268,53 +305,55 @@
 
 ## Phase 2：易用性增强
 
-- [ ] Session 自动命名
-- [ ] Session note
-- [ ] Session tag
-- [ ] Session pin
+- [x] Session 自动命名
+- [x] Session note
+- [x] Session tag
+- [x] Session pin
 - [ ] Session search
-- [ ] Log grep
-- [ ] Log export
+- [x] Log grep
+- [x] Log export
 - [ ] Log redact
-- [ ] Independent history
-- [ ] Idle detection
-- [ ] Auto cleanup
+- [x] Independent history
+- [x] Idle detection
+- [x] Idle GC
 - [ ] Better list output
-- [ ] More detailed session info
-- [ ] Shell completion
-- [ ] Man page
+- [x] Better doctor
+- [x] Replay mode
+- [x] Shell completion（M48：bash/zsh/fish、包接入和定向验证）
+- [x] Man page（M47：persist/persistd、groff 与三种包验证）
 
 ---
 
 ## Phase 3：恢复与观测增强
 
-- [ ] Replay mode
-- [ ] Read-only attach
-- [ ] 多客户端可写 attach
-- [ ] Single active writer policy
-- [ ] Attach takeover 策略
-- [ ] Session lock
-- [ ] Foreground process detection
-- [ ] Process tree
-- [ ] Resource monitor
-- [ ] SSH_AUTH_SOCK sync
-- [ ] Snapshot
-- [ ] Metrics
+- [x] Replay mode
+- [x] Read-only attach
+- [x] 多客户端可写 attach（M15：pipe 信号 takeover）
+- [x] Single active writer policy（M15：单 active writer，second client 触发 takeover）
+- [x] Attach takeover 策略（M15：pipe 唤醒原 io_loop，释放后转交新 client）
+- [x] 多 active writer 协作（M35：WRITE_REQUEST/GRANTED/REVOKED 通知后立即交接）
+- [x] Session lock（M36：持久化锁定状态，阻止 attach/kill/Idle GC）
+- [x] Foreground process detection（M37：PTY 前台进程组与 `/proc` 命令摘要）
+- [x] Process tree（M38）
+- [x] Resource monitor（M39）
+- [x] SSH_AUTH_SOCK sync（M40）
+- [x] Snapshot（M41）
+- [x] Metrics（M42）
 - [ ] Performance dashboard
 
 ---
 
 ## Phase 4：发布和长期维护
 
-- [ ] deb package
-- [ ] rpm package
-- [ ] tarball release
-- [ ] GitHub Actions package build
-- [ ] GitHub Actions artifact upload
-- [ ] 生成 release checksums
-- [ ] Security review
-- [ ] Compatibility matrix
-- [ ] Performance regression
-- [ ] v1.0 release checklist
-- [ ] User documentation complete
-- [ ] Troubleshooting guide complete
+- [x] deb package（M46：本机构建、解包和 checksum 验证）
+- [x] rpm package（M46：test Rocky 原生构建、内容和 checksum 验证）
+- [x] tarball release（M46：本机构建、解包执行和 checksum 验证）
+- [x] GitHub Actions package build（M46：workflow 复用本地打包入口，待 mirror 触发）
+- [x] GitHub Actions artifact upload（M46：上传 tarball/deb/rpm 与 checksums）
+- [x] 生成 release checksums（M46）
+- [x] Security review（M44：socket、日志、metadata 权限与输入边界审查）
+- [x] Compatibility matrix（M45：Ubuntu bash/zsh/fish、Rocky bash 基线）
+- [x] Performance regression（M43：本地和 test 主机 100/500/1000 Session 基准）
+- [x] v1.0 release checklist（M50：已确认发布 0.1.0；tag、push、GitHub workflow 与公开发布待维护者授权）
+- [x] User documentation complete（M49：命令、配置、安装、FAQ 一致性审计）
+- [x] Troubleshooting guide complete（M49：daemon、socket、权限、恢复、日志和绕过）

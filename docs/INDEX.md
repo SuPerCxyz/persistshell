@@ -55,6 +55,9 @@
 - `docs/user/CONFIG.md`
 - `docs/user/COMMANDS.md`
 - `docs/user/FAQ.md`
+- `docs/user/TROUBLESHOOTING.md`
+- `docs/man/persist.1`
+- `docs/man/persistd.1`
 
 ## 维护与社区
 
@@ -65,10 +68,13 @@
 - `CODE_OF_CONDUCT.md`
 - `docs/known/KNOWN_ISSUES.md`
 - `docs/known/LIMITATIONS.md`
+- `docs/release/RELEASE_CHECKLIST.md`
+- `docs/audit/2026-07-15-m50-release-readiness.md`
 - `docs/adr/ADR-0000-template.md`
 - `docs/adr/ADR-0001-rust-primary-language.md`
 - `docs/design/LICENSING.md`
 
 ## 当前约束
 
-本仓库当前包含文档和 Rust 工程骨架。PTY、daemon runtime、IPC streaming、SSH 接管和安装器仍需在后续任务中按文档逐步实现。
+Rust runtime、PTY、daemon、IPC streaming、SSH 接管、安装器和发布包均已实现并完成阶段性验证。
+M50 已完成本地与 test 主机的发布就绪检查；远端 tag、GitHub workflow 与公开发布仍须维护者授权。

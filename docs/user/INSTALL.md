@@ -16,23 +16,14 @@ ssh node
 
 ---
 
-## Phase 1 安装方式
-
-Phase 1 推荐提供：
+## 安装方式
 
 ```bash
 persist install
 ```
 
-安装内容：
-
-- 创建配置目录
-- 创建数据目录
-- 创建状态目录
-- 创建 runtime 目录
-- 注入 shell profile hook
-- 检查权限
-- 验证 daemon 可启动
+当前 `persist install` 会识别 bash 或 zsh profile，在其中追加带标记的 SSH hook。重复安装会
+拒绝重复插入。目录、socket、metadata 和日志会在 daemon 或相关命令首次运行时创建。
 
 ---
 
@@ -68,13 +59,8 @@ persist install
 
 安装器需要根据用户 shell 注入 hook。
 
-支持：
-
-- bash
-- zsh
-- fish
-
-Phase 1 至少支持 bash。
+当前 hook 安装器支持 bash 和 zsh。fish 有 completion，但 `persist install` 尚不管理 fish
+profile；可手动按当前 hook 逻辑配置。
 
 ---
 
@@ -83,22 +69,41 @@ Phase 1 至少支持 bash。
 示例：
 
 ```bash
-# PersistShell hook
-if command -v persist >/dev/null 2>&1; then
-  if [ -n "$SSH_CONNECTION" ] &&
-     [ -t 0 ] &&
-     [ -t 1 ] &&
-     [ -z "$SSH_ORIGINAL_COMMAND" ] &&
-     [ -z "$PERSIST_DISABLE" ] &&
-     [ -z "$SH_DISABLE" ] &&
-     [ -z "$PERSIST_ACTIVE" ]; then
-    export PERSIST_ACTIVE=1
-    exec persist
-  fi
+if [ -n "$SSH_TTY" ] && [ -z "${PERSIST_DISABLE:-}" ] && command -v persist >/dev/null 2>&1; then
+  persist daemon start >/dev/null 2>&1 || true
+  persist attach 2>/dev/null
 fi
 ```
 
 实际 hook 应由 install 命令生成和管理。
+
+---
+
+## Shell Completion
+
+Shell completion 与 SSH hook 独立。`persist install` 不安装 completion；发行版包安装后，
+bash、zsh 和 fish 会从各自的标准目录发现补全文件。
+
+从 tarball 或源码目录使用时，可按 shell 手动启用：
+
+```bash
+# bash
+source completions/persist.bash
+```
+
+```bash
+# zsh
+fpath=("$PWD/completions" $fpath)
+autoload -Uz compinit && compinit
+```
+
+```fish
+# fish
+source completions/persist.fish
+```
+
+Session ID 候选只读取 `persist ls`。daemon 未运行、命令不可用或列表失败时，补全静默返回
+空候选，不会启动 daemon 或创建 Session。
 
 ---
 
@@ -118,15 +123,8 @@ persist install
 
 ## 备份
 
-安装前必须备份被修改的 profile 文件。
-
-例如：
-
-```text
-~/.bashrc.persistshell.bak
-```
-
-或者记录 patch block。
+当前安装器不创建 profile 备份。首次执行前应由用户自行备份对应的 `.bashrc`、`.bash_profile`
+或 `.zshrc`；这是当前已知限制。
 
 ---
 
@@ -162,12 +160,6 @@ persist uninstall --purge
 PERSIST_DISABLE=1 ssh node
 ```
 
-或：
-
-```bash
-SH_DISABLE=1 ssh node
-```
-
 也可以执行非交互命令：
 
 ```bash
@@ -194,27 +186,16 @@ persist doctor
 
 ---
 
-## systemd user service
+## Daemon 管理
 
-后续版本可以支持 systemd user service。
+当前不提供 systemd user unit。SSH hook 会尝试启动 daemon；手动使用时先执行：
 
-Phase 1 可以按需启动 daemon。
+```bash
+persist daemon start
+persist daemon status
+```
 
-注意：
-
-没有 linger 时，systemd user service 可能在用户完全退出后停止。
-
----
-
-## 非 systemd 环境
-
-PersistShell 必须支持非 systemd 环境。
-
-Fallback：
-
-- client auto-spawn daemon
-- lock file
-- runtime dir fallback
+普通 `persist new`、`persist ls` 或 `persist attach <id>` 不会代替用户启动 daemon。
 
 ---
 

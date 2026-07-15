@@ -13,8 +13,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  linux-tarball:
-    name: Linux tarball
+  linux-packages:
+    name: Linux packages
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,31 +28,22 @@ jobs:
       - name: Build release binaries
         run: cargo build --release --workspace --locked
 
-      - name: Create package
-        shell: bash
+      - name: Install package tools
         run: |
           set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes rpm
 
-          version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
-          target_triple="x86_64-unknown-linux-gnu"
-          package_name="persistshell-v${version}-${target_triple}"
-
-          mkdir -p "dist/${package_name}/bin" "dist/${package_name}/docs"
-          cp target/release/persist "dist/${package_name}/bin/"
-          cp target/release/persistd "dist/${package_name}/bin/"
-          cp README.md LICENSE CHANGELOG.md "dist/${package_name}/"
-          cp docs/INDEX.md "dist/${package_name}/docs/"
-          cp -R docs/user "dist/${package_name}/docs/user"
-
-          tar -czf "dist/${package_name}.tar.gz" -C dist "${package_name}"
-          (cd dist && sha256sum "${package_name}.tar.gz" > "${package_name}.tar.gz.sha256")
+      - name: Create packages
+        run: scripts/package-release.sh tarball deb rpm
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: persistshell-linux-tarball
+          name: persistshell-linux-packages
           path: |
             dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
             dist/*.sha256
           if-no-files-found: error
-

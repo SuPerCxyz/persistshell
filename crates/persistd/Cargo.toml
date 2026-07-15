@@ -14,4 +14,11 @@ path = "src/main.rs"
 
 [dependencies]
 persist-core = { path = "../persist-core" }
+persist-ipc = { path = "../persist-ipc" }
+persist-metadata = { path = "../persist-metadata" }
+persist-pty = { path = "../persist-pty" }
+libc = "0.2"
+serde_json.workspace = true
 
+[dev-dependencies]
+tempfile = "3"

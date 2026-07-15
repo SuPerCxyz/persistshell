@@ -11,6 +11,8 @@ pub struct DaemonConfig {
     pub auto_start: bool,
     pub idle_exit: bool,
     pub idle_exit_after: DurationValue,
+    pub gc_idle_timeout: DurationValue,
+    pub gc_interval: DurationValue,
 }
 
 impl Default for DaemonConfig {
@@ -19,6 +21,8 @@ impl Default for DaemonConfig {
             auto_start: true,
             idle_exit: true,
             idle_exit_after: DurationValue::from_secs(10 * 60),
+            gc_idle_timeout: DurationValue::from_secs(0),
+            gc_interval: DurationValue::from_secs(60),
         }
     }
 }
@@ -33,6 +37,12 @@ impl DaemonConfig {
         }
         if let Some(value) = partial.idle_exit_after {
             self.idle_exit_after = value;
+        }
+        if let Some(value) = partial.gc_idle_timeout {
+            self.gc_idle_timeout = value;
+        }
+        if let Some(value) = partial.gc_interval {
+            self.gc_interval = value;
         }
     }
 }
@@ -269,6 +279,8 @@ pub(super) struct PartialDaemonConfig {
     auto_start: Option<bool>,
     idle_exit: Option<bool>,
     idle_exit_after: Option<DurationValue>,
+    gc_idle_timeout: Option<DurationValue>,
+    gc_interval: Option<DurationValue>,
 }
 
 #[derive(Debug, Default, Deserialize)]
