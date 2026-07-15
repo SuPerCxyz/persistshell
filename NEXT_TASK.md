@@ -29,12 +29,13 @@ M50：v1.0 Release Readiness
 - M49 已完成用户文档、FAQ、故障排查与三种包文档验证。
 - M50 本地/test 发布就绪检查、release checklist 与审计记录已完成。
 - 维护者已确认发布版本为 `0.1.0`，对应 tag 为 `v0.1.0`。
+- 发布实现已推送并同步到 GitHub，分支 CI run `29413709266` 通过。
 
 ---
 
 ## 任务范围
 
-- 提交、push 并确认 GitHub mirror 同步；创建与版本一致的 tag。
+- 提交并推送最终 release metadata；创建与版本一致的 tag。
 - 检查 GitHub CI/package workflow，独立复核下载 artifact 的 checksum 与内容。
 - 按维护者决定创建 GitHub Release、发布说明和可选签名。
 

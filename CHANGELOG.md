@@ -8,6 +8,8 @@
 
 ## Unreleased
 
+## [0.1.0] - 2026-07-15
+
 ### Added
 
 - 完成 M50 发布就绪审计和维护者 release checklist；明确区分已验证的本地/test 包与尚需授权的

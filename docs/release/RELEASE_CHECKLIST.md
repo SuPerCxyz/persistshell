@@ -21,9 +21,10 @@
 
 ## 发布前由维护者执行
 
-- [ ] 审查工作区改动、许可证与最终 release notes；确认没有凭证或未预期文件。
+- [x] 审查工作区改动、许可证与最终 release notes；未发现凭证或未预期构建产物。
 - [x] 维护者确认发布版本为 `0.1.0`，tag 为 `v0.1.0`；workspace manifest 无需改版。
-- [ ] 提交已审查改动并推送权威仓库；确认 GitHub mirror 已同步。
+- [x] 发布实现和 CI 修复已推送权威仓库，GitHub mirror 同步到 `b7e4cc2`；对应 CI run
+  `29413709266` 通过。
 - [ ] 在 GitHub mirror 创建并推送 tag，确认 `ci.yml` 和 `package.yml` 成功运行。
 - [ ] 下载 workflow artifact，独立执行 `sha256sum --check`，检查 tarball、deb、rpm 的版本、架构、
   许可证、man page、completion 和用户文档。
@@ -33,13 +34,13 @@
 
 ## 当前未覆盖边界
 
-- GitHub hosted runner 尚未实际触发；workflow 定义与 YAML 仅在本地检查。
+- GitHub hosted runner 的分支 CI 已通过；tag package workflow 尚未触发。
 - 已验证 Linux x86_64 的 Ubuntu 与 Rocky 基线，未验证其他架构、发行版或 macOS。
 - test 主机没有 zsh/fish 端到端交互环境；相应补全已作语法和打包路径验证。
 - daemon 崩溃后的 PTY 存活、所有全屏 TUI 的画面恢复不属于当前承诺。
 - 当前 workflow 上传 artifact，但不自动创建 GitHub Release，也不执行签名。
 
-## 明确未执行的操作
+## 当前尚未执行的操作
 
-本次就绪检查没有创建 tag、提交、push、触发 GitHub Actions、上传 artifact、创建 GitHub Release
-或签名。上述操作必须在维护者明确授权后进行。
+尚未创建或推送 tag、下载 GitHub artifact、创建 GitHub Release 或签名。提交、push、mirror 同步
+和分支 CI 已完成；剩余操作继续按本清单记录实际结果。
