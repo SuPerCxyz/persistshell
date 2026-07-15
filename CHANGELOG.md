@@ -27,6 +27,8 @@
 
 ### Fixed
 
+- GitHub CI 显式安装 zsh 和 fish，确保 PTY shell 兼容性测试不依赖 hosted runner 的预装软件。
+
 - 修复 Closed Session 恢复上下文在部分 `/proc` 捕获后可能丢失已有环境快照的问题；关闭时逐字段
   合并 cwd 和允许恢复的环境。
 

@@ -24,6 +24,11 @@ jobs:
           rustup toolchain install stable --profile minimal --component rustfmt --component clippy
           rustup default stable
 
+      - name: Install test shells
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes fish zsh
+
       - name: Show toolchain
         run: |
           rustc --version
@@ -37,4 +42,3 @@ jobs:
 
       - name: Test
         run: cargo test --workspace --all-features
-
