@@ -10,6 +10,8 @@
 
 ### Added
 
+- 完成 M52 Performance dashboard 设计与 ADR，确定 `persist top`、Daemon 有界采样 worker、
+  1 小时内存趋势、24 小时磁盘聚合及严格资源和隐私边界。
 - 新增 `persist ls` TTY 交互选择、`persist ls <id>` 直接菜单和 `--plain` 脚本模式；历史页按
   最新优先每页 50 条显示，并可返回菜单、attach 或退出。
 - 新增有界结构化 Shell 命令历史、受限 stdin helper，以及不修改 dotfile 的 bash/zsh/fish

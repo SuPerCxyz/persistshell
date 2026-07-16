@@ -22,37 +22,39 @@ M52：Performance dashboard
 
 ## 当前唯一任务
 
-先完成 Performance dashboard 的需求、数据来源、资源边界和验收标准设计，不直接编码。
+M52 阶段 1：使用 TDD 定义并实现 Dashboard IPC 数据结构与编解码，不接入 daemon 或 TUI。
 
 ### 前置已完成
 
 - M51 的完整用户手册、交互式 Session 选择和实时命令历史已完成。
 - Ubuntu 26.04 tar/deb 与 Rocky Linux 9.7 RPM 已验证携带完整用户手册。
 - Rocky test 主机已验证列表选择、菜单 attach、退出后返回和最新优先历史。
+- M52 中文设计规范已确认，`ADR-0004` 已接受。
+- 实施计划已拆分为 IPC、内存模型、procfs、存储、worker、daemon、TUI 和验证阶段。
 
 ---
 
 ## 任务范围
 
-- 明确 dashboard 面向的用户和必须解决的操作问题。
-- 明确复用现有 metrics/snapshot 还是增加新 IPC，并评估兼容性。
-- 定义采样频率、保留周期、磁盘/内存上限和敏感数据边界。
-- 定义 CLI 或其他展示入口，不默认引入 Web 服务。
-- 形成中文设计规范；若涉及公共协议或持久化，再创建 ADR。
+- 新增独立 `dashboard` 协议模块和四个消息类型。
+- 定义 summary 分页请求响应、trend scope/range 请求响应和完整性状态。
+- 使用固定宽度、显式大小端的受限二进制编码。
+- 测试非法枚举、非法游标、超限页大小、超过 240 点、截断 payload 和尾随数据。
+- 更新客户端与 Socket 协议文档。
 
 ---
 
 ## 完成标准
 
-1. 需求目标、非目标和目标用户明确。
-2. 数据模型、采样与资源上限明确。
-3. 隐私、安全、兼容性和失败降级明确。
-4. 方案对比、选择理由、测试策略和验收标准明确。
-5. 用户确认设计后，才拆分实现任务。
+1. 先提交失败测试，再完成最小协议实现。
+2. 新消息 round-trip、错误路径和边界测试通过。
+3. 最大合法响应小于 `MAX_CONTROL_FRAME`。
+4. 既有 IPC 消息编号和 round-trip 测试不变。
+5. `cargo test -p persist-ipc`、格式检查和定向 Clippy 通过。
 
 ---
 
 ## 禁止事项
 
-不得直接实现 dashboard，不得默认启动 HTTP 服务，不得引入无限时序数据，不得暴露 Session
+不得接入 daemon 采样、磁盘存储或 TUI，不得修改 `persist metrics` 语义，不得暴露 Session
 内容、命令历史、环境变量或敏感路径。远端 push 仍须维护者授权。
