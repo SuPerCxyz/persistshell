@@ -76,6 +76,7 @@
 - `docs/adr/ADR-0001-rust-primary-language.md`
 - `docs/adr/ADR-0002-closed-session-recovery-context.md`
 - `docs/adr/ADR-0003-transient-shell-history-hooks.md`
+- `docs/adr/ADR-0004-bounded-performance-dashboard.md`
 - `docs/design/LICENSING.md`
 
 ## 当前约束
