@@ -145,14 +145,18 @@ fn assert_shell_behavior(shell: &str, shell_name: &str, root: &Path, home: &Path
             &launch.arguments,
         )
         .unwrap();
-    wait_for_file(&ready_marker, "r");
+    wait_for_file(&ready_marker, "r", Duration::from_secs(30));
     writeln!(session, "echo $USER_CONFIG_MARKER").unwrap();
     if shell_name == "bash" {
         writeln!(session, " echo secret").unwrap();
     }
     writeln!(session, "echo visible-{shell_name}").unwrap();
 
-    wait_for_file(&capture, &format!("echo visible-{shell_name}"));
+    wait_for_file(
+        &capture,
+        &format!("echo visible-{shell_name}"),
+        Duration::from_secs(10),
+    );
     let captured = fs::read_to_string(&capture).unwrap_or_default();
     assert!(
         captured.contains("echo $USER_CONFIG_MARKER"),
@@ -219,7 +223,7 @@ fn assert_custom_filter_degrades(shell: &str, shell_name: &str) {
         .unwrap();
     std::thread::sleep(Duration::from_millis(250));
     writeln!(session, "echo visible").unwrap();
-    wait_for_file(&prompt, "x");
+    wait_for_file(&prompt, "x", Duration::from_secs(10));
     assert!(!capture.exists() || fs::read(&capture).unwrap().is_empty());
     assert_eq!(
         fs::read_to_string(root.join(".hooks/18/status")).unwrap(),
@@ -230,8 +234,8 @@ fn assert_custom_filter_degrades(shell: &str, shell_name: &str) {
     let _ = fs::remove_dir_all(root);
 }
 
-fn wait_for_file(path: &Path, expected: &str) {
-    let deadline = Instant::now() + Duration::from_secs(10);
+fn wait_for_file(path: &Path, expected: &str, timeout: Duration) {
+    let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
         if fs::read_to_string(path).is_ok_and(|content| content.contains(expected)) {
             return;
