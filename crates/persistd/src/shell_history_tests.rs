@@ -108,6 +108,10 @@ fn assert_shell_behavior(shell: &str, shell_name: &str, root: &Path, home: &Path
     let ready_marker = root.join("ready-marker");
     let launch = prepare(shell, 17, root, &helper).unwrap().unwrap();
     let mut environment = launch.environment;
+    if shell_name == "zsh" {
+        set_environment(&mut environment, "PERSIST_ORIGINAL_ZDOTDIR", home);
+        set_environment(&mut environment, "PERSIST_ORIGINAL_ZDOTDIR_SET", "1");
+    }
     environment.extend([
         ("HOME".into(), home.to_string_lossy().into_owned()),
         (
@@ -159,6 +163,13 @@ fn assert_shell_behavior(shell: &str, shell_name: &str, root: &Path, home: &Path
     assert!(fs::metadata(prompt_marker).is_ok());
     writeln!(session, "exit").unwrap();
     let _ = fs::remove_dir_all(root);
+}
+
+fn set_environment(environment: &mut [(String, String)], name: &str, value: impl AsRef<Path>) {
+    let value = value.as_ref().to_string_lossy().into_owned();
+    if let Some((_, current)) = environment.iter_mut().find(|(key, _)| key == name) {
+        *current = value;
+    }
 }
 
 fn assert_custom_filter_degrades(shell: &str, shell_name: &str) {
