@@ -41,8 +41,10 @@ Attach to an existing session.  Without an ID, create and attach to a new
 session.  A writable attach takes the active writer role from any prior
 writer; readonly attaches receive output but cannot send input.
 .TP
-.B ls [\fB-t\fR|\fB--tag\fR \fITAG\fR]
-List sessions, optionally restricted to one tag.
+.B ls [\fIID\fR] [\fB--plain\fR] [\fB-t\fR|\fB--tag\fR \fITAG\fR]
+List sessions.  On a terminal, select a session to view newest-first shell
+command history, attach, return to the list, or quit.  An ID opens that session
+directly.  Non-terminal output and \fB--plain\fR retain the table-only form.
 .TP
 .B ps \fIID\fR
 Show the foreground process tree for a session.

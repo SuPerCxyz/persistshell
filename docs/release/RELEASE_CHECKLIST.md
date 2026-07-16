@@ -16,6 +16,7 @@
 - [x] `scripts/test-completions.sh` 与 `groff -man` 定向验证通过。
 - [x] test Rocky Linux 9.7 原生构建 rpm，验证 checksum、二进制、压缩 man page、三种 completion
   及用户文档路径。
+- [ ] M51 完成后验证 tar、deb 和 rpm 均携带 `USER_GUIDE.md`，且安装路径可直接阅读。
 - [x] test 已安装二进制在隔离 XDG 环境完成 daemon、new、list、close、SIGTERM 清理流程。
 - [x] M43 benchmark、M44 安全审查、M45 兼容性矩阵已有审计记录。
 

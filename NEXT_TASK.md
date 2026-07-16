@@ -16,46 +16,43 @@ Phase 4：发布和长期维护
 
 ## 当前里程碑
 
-M50：v1.0 Release Readiness
+M51：交互式命令历史与完整用户手册
 
 ---
 
 ## 当前唯一任务
 
-由维护者确定 GitHub Release、artifact 附件、签名与 SBOM 策略。
+先更新完整用户文档，再实现 `persist ls` 交互选择和实时 Shell 命令历史。
 
 ### 前置已完成
 
-- M49 已完成用户文档、FAQ、故障排查与三种包文档验证。
-- M50 本地/test 发布就绪检查、release checklist 与审计记录已完成。
-- 维护者已确认发布版本为 `0.1.0`，对应 tag 为 `v0.1.0`。
-- 发布实现已推送并同步到 GitHub，分支 CI run `29413709266` 通过。
-- `v0.1.0` 已同步到 GitHub，tag CI run `29414016648` 和 Package run `29414016642` 通过。
-- tag 后平台修复已同步到提交 `3cbe15d`；Package run `29464594020` 的 Ubuntu 26.04 与
-  RHEL 9 job 均通过。
-- 两个平台 artifact 已下载并独立复核，RHEL 9 RPM 已部署到 test 完成核心回归。
+- M50 的 `v0.1.0` tag、平台包、artifact 和 test 部署已验证完成。
+- GitHub Release、签名和 SBOM 由维护者决定暂缓，不阻塞 M51。
+- ADR-0003 和两份中文设计规范已确认。
 
 ---
 
 ## 任务范围
 
-- 决定是否为现有 `v0.1.0` 创建 GitHub Release，或等待后续修复版本。
-- 若创建 Release，明确附加历史 tag 产物还是 tag 后平台产物；不得把历史 Ubuntu RPM 标记为 RHEL 9 兼容。
-- 决定是否对 artifact 签名、生成 SBOM 或补充 `NOTICE`。
-- 不移动或改写现有 `v0.1.0` tag。
+- 先完成 ADR、架构、命令、完整用户手册、FAQ、故障排查和测试文档。
+- 实现有界结构化命令记录和隐藏受限写入入口。
+- 为 bash、zsh、fish 安装不修改用户 dotfile 的临时 history hook。
+- 实现 `persist ls` TTY 交互、`persist ls <id>` 菜单和最新优先分页。
+- 保持非 TTY、管道和重定向的现有表格行为。
 
 ---
 
 ## 完成标准
 
-1. 发布或暂缓策略得到维护者明确确认。
-2. artifact 来源、兼容性标签和附件集合没有歧义。
-3. 签名、SBOM 与 `NOTICE` 的执行或暂缓状态写入发布清单。
-4. 若创建 Release，发布结果和最终 digest 写入审计；若暂缓，记录下一次评估条件。
+1. 用户只读 `USER_GUIDE.md` 即可完成安装、使用、恢复和排障。
+2. `persist ls` 两种交互入口、返回和 attach 流程通过测试。
+3. 三种 Shell 的实时历史、用户配置兼容、隐私和失败降级通过测试。
+4. 历史倒序分页、权限、容量、多行命令和损坏记录通过测试。
+5. 三种包包含完整手册，test 主机部署验收通过。
 
 ---
 
 ## 禁止事项
 
-执行前必须取得维护者对最终版本、远端推送、tag、GitHub Release 与签名策略的明确授权；未授权时
-不得执行任何远端写操作，也不得为未验证的平台、Shell 或 TUI 行为给出支持承诺。
+不得记录 PTY 原始输入、修改用户 dotfile、覆盖用户 hook 或引入无限历史文件。未完成三种 Shell
+兼容和 test 验证前，不得对实时历史支持给出完成承诺。远端 push 仍须维护者授权。

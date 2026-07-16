@@ -114,6 +114,14 @@ side channel，当前版本尚未实现。
 `--speed` 尚不能按原始节奏回放；`--follow` 尚未持续监听文件变化。这两个参数当前可解析但
 不会改变输出行为。
 
+### 实时命令历史依赖 Shell 原生 history
+
+PersistShell 不解析 PTY 输入，也不绕过用户的 history 过滤。用户禁用原生 history 时，实时命令
+记录为空。bash/zsh 的复杂 prompt hook 或 fish 自定义 `fish_should_add_to_history` 无法安全组合
+时，系统优先保持用户配置行为并降级为实时历史不可用；attach 和输出日志不受影响。
+
+实时记录只安装到 PersistShell 启动的根 Shell。用户在其中再次启动的嵌套 Shell 不保证继续同步。
+
 ---
 
 ### 日志脱敏暂不完整

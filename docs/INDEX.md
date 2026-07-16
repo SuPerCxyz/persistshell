@@ -51,6 +51,7 @@
 
 ## 用户文档
 
+- `docs/user/USER_GUIDE.md`：普通用户唯一需要阅读的完整手册。
 - `docs/user/INSTALL.md`
 - `docs/user/CONFIG.md`
 - `docs/user/COMMANDS.md`
@@ -73,6 +74,8 @@
 - `docs/audit/2026-07-15-m50-platform-package-remote-validation.md`
 - `docs/adr/ADR-0000-template.md`
 - `docs/adr/ADR-0001-rust-primary-language.md`
+- `docs/adr/ADR-0002-closed-session-recovery-context.md`
+- `docs/adr/ADR-0003-transient-shell-history-hooks.md`
 - `docs/design/LICENSING.md`
 
 ## 当前约束

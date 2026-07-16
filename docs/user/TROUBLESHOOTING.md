@@ -90,6 +90,28 @@ persist log export <id> --output session.log
 `logging.session_log = false` 时不会写入 Session 输出日志。输出包含的密码或 token 不会被自动
 识别和删除，处理日志时应遵守本机安全要求。
 
+## `persist ls` 看不到最新命令历史
+
+先确认是在真实终端中运行；脚本、管道和重定向会自动使用纯表格模式。可直接指定 Session：
+
+```bash
+persist ls 2
+```
+
+实时历史只记录被 Shell 原生 history 接受的命令。如果用户配置禁用 history、过滤了该命令，
+或临时 hook 安装失败，记录不会出现。该故障不影响 Shell、attach 或输出日志；终端输出仍可用：
+
+```bash
+persist log 2
+persist replay 2
+```
+
+PersistShell 不会为了修复实时历史而修改用户 Shell 配置。记录文件权限应为 `0600`：
+
+```bash
+ls -l ~/.local/share/persistshell/history/2.commands
+```
+
 ## 直接运行 persistd
 
 前台诊断用法：

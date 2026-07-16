@@ -110,6 +110,11 @@ Shell 应拥有：
 - 正确环境变量
 - 正确 cwd
 
+对 bash、zsh 和 fish，PTY Engine 可在 Shell 进程内安装临时命令历史 hook。集成层必须先加载
+用户原配置，不编辑 dotfile，不覆盖已有 prompt/history hook，并在失败时降级为普通 Shell。
+hook 通过短生命周期 `persist` helper 写入受限的 Session 命令记录；helper 失败不能阻塞 prompt
+或改变上一条用户命令的退出状态。
+
 ---
 
 ## Foreground Process

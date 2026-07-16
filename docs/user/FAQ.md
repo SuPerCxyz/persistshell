@@ -129,6 +129,16 @@ persist uninstall --purge
 
 可以关闭 Session 日志。
 
+## `persist ls` 的命令历史会记录密码吗？
+
+实时命令历史不读取 PTY 原始输入，只镜像已经被 bash、zsh 或 fish 原生 history 接受的命令。
+密码程序直接从终端读取的内容不会记录。用户在普通命令行中直接写入的 token 或密码，是否进入
+记录仍由 `HISTCONTROL`、`HISTIGNORE`、`zshaddhistory`、`fish_should_add_to_history` 等原生
+规则决定。敏感命令应继续使用 Shell 自身的 history 排除机制。
+
+PersistShell 不修改用户的 `.bashrc`、`.zshrc` 或 `config.fish`。临时 history hook 只存在于
+当前 Session 的根 Shell 进程中；安装失败时 Shell 仍可使用，但实时历史会显示为不可用。
+
 ---
 
 ## SSH agent 会传给 Session 吗？

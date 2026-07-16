@@ -423,15 +423,20 @@ Session 进入 Closed 状态时，PersistShell 应保存环境变量快照。
 
 ## History
 
-Phase 2 建议每个 Session 独立 history。
-
-例如：
+每个 Session 使用独立 Shell history，并额外维护供 `persist ls` 查询的实时命令记录：
 
 ```text
 ~/.local/share/persistshell/history/<session-id>.history
+~/.local/share/persistshell/history/<session-id>.commands
 ```
 
-Phase 1 可以暂不实现。
+`.history` 由 Shell 原生 history 机制管理；`.commands` 只镜像已被原生 history 接受的命令，
+不解析 PTY 输入。记录包含顺序、完成时间、Shell 类型和完整多行命令，默认最多 10,000 条或
+4 MiB，目录权限为 `0700`，文件权限为 `0600`。
+
+`persist ls` 的历史视图按序号倒序分页，最新命令优先。Running 和 Closed Session 都可以查看。
+临时 Shell hook 必须先加载用户原配置，再组合已有 hook；不得编辑用户 dotfile。hook 失败时
+Shell 继续正常运行，只将实时命令历史视为不可用。详细决策见 ADR-0003。
 
 ---
 

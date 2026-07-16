@@ -70,6 +70,14 @@ ssh node
 
 自动接管场景可以在容器或测试 VM 中验证。
 
+`persist ls` 交互测试还必须覆盖：Session ID 选择、指定 ID 菜单、最新优先历史分页、查看后
+attach、attach 返回菜单、返回其他 Session 和退出。stdin/stdout 非 TTY、管道和重定向必须
+保持当前纯表格输出。
+
+实时命令历史分别在 bash、zsh 和 fish 验证：用户配置先执行，已有 hook 保留，原生 history
+过滤继续生效，多行命令保持单条记录，helper 失败不影响 Shell。记录文件还需覆盖 `0600`
+权限、损坏输入、10,000 条/4 MiB 上限和并发读取。
+
 ---
 
 ## PTY 测试

@@ -2,6 +2,12 @@
 
 本文档描述 PersistShell 的安装、卸载和绕过方式。
 
+完整安装后使用、Session 管理、恢复和排障流程见 `USER_GUIDE.md`。发行包安装路径为：
+
+```text
+/usr/share/doc/persistshell/USER_GUIDE.md
+```
+
 ---
 
 ## 安装目标

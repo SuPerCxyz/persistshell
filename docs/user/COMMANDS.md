@@ -11,6 +11,8 @@ persist
 persist version
 persist new
 persist ls
+persist ls <id>
+persist ls --plain
 persist ps <id>
 persist stats <id>
 persist snapshot <id>
@@ -75,11 +77,30 @@ persist new
 
 ## persist ls
 
-列出 Sessions。
+列出并选择 Sessions。
 
 ```bash
 persist ls
+persist ls 2
+persist ls --plain
 ```
+
+stdin 和 stdout 都连接真实终端时，`persist ls` 显示列表后进入交互选择。输入 Session ID 后，
+可以查看该 Session 的 Shell 命令历史、attach、返回列表或退出。`persist ls <id>` 直接打开
+指定 Session 菜单。
+
+```text
+[h] 查看命令历史
+[a] attach 进入会话
+[b] 返回 Session 列表
+[q] 退出
+```
+
+命令历史默认每页显示最近 50 条，最新执行的命令优先。查看后仍回到菜单，可进入当前 Session
+或返回选择其他 Session。Closed Session 也可以查看历史和 attach 冷恢复。
+
+管道、重定向、completion 和非交互 SSH 中，`persist ls` 保持当前纯表格输出并立即退出。
+`--plain` 可在 TTY 中强制使用该行为。
 
 `FOREGROUND` 列显示运行中 Session 的前台进程命令摘要；没有前台进程或无法读取
 `/proc` 时显示 `-`。
