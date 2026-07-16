@@ -415,6 +415,8 @@
 
 ### Fixed
 
+- 修复 installer profile 测试依赖 runner `SHELL` 和真实 HOME 的问题，改用隔离临时目录，避免
+  GitHub Actions 在无 `SHELL` 环境下误报失败。
 - 完成 M44 安全审查：收紧 metadata、session log 和 stale socket 清理边界，并补齐权限测试。
 - `persist daemon start` 现在显式以 `0600` 创建并重设 runtime daemon log 权限，不再依赖 umask。
 - 修复 ClientSocket 将 5 秒握手超时保留到后续操作的问题；高负载 `persist new` 不再因该超时误报 `EAGAIN`。

@@ -45,9 +45,15 @@ pub fn uninstall(config: &Config, purge: bool) -> Result<()> {
 }
 
 fn detect_profile() -> Result<PathBuf> {
-    if let Ok(shell) = std::env::var("SHELL") {
-        let home = home_dir()
-            .ok_or_else(|| PersistError::invalid_argument("cannot determine home directory"))?;
+    let shell = std::env::var("SHELL").ok();
+    let home = home_dir();
+    detect_profile_for(shell.as_deref(), home.as_deref())
+}
+
+fn detect_profile_for(shell: Option<&str>, home: Option<&Path>) -> Result<PathBuf> {
+    if let Some(shell) = shell {
+        let home =
+            home.ok_or_else(|| PersistError::invalid_argument("cannot determine home directory"))?;
 
         if shell.ends_with("/zsh") {
             let zshrc = home.join(".zshrc");
@@ -186,17 +192,14 @@ mod tests {
 
     #[test]
     fn detect_profile_returns_bashrc() {
-        let home = home_dir().unwrap();
-        let bashrc = home.join(".bashrc");
-        let existed = bashrc.exists();
-        if !existed {
-            fs::write(&bashrc, "").unwrap();
-        }
-        let result = detect_profile();
-        if !existed {
-            let _ = fs::remove_file(&bashrc);
-        }
-        assert!(result.is_ok());
+        let home =
+            std::env::temp_dir().join(format!("persist_test_profile_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&home);
+        fs::create_dir_all(&home).unwrap();
+        let result = detect_profile_for(Some("/bin/bash"), Some(&home)).unwrap();
+        assert_eq!(result, home.join(".bashrc"));
+        assert!(result.exists());
+        let _ = fs::remove_dir_all(home);
     }
 
     #[test]
