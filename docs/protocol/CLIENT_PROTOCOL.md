@@ -142,6 +142,7 @@ Dashboard 指标约定：
 - CPU 使用整数千分之一百分点传输，`100% = 100000`，多核任务允许超过 `100%`。
 - 时间戳使用 Unix epoch 毫秒。
 - RSS 使用 KiB，I/O 实时值使用 bytes/s，趋势使用时间桶内累计 bytes。
+- 首个采样点或计数器回退时 `rates_available` 为 false，CPU/I/O 必须显示暂无数据而不是零。
 - `complete`、`partial`、`stale` 和 `unavailable` 必须在界面中可区分。
 - Session 列表每页最多 128 条，趋势每次最多 240 点。
 

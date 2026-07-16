@@ -124,6 +124,7 @@ pub fn decode_summary_response(payload: &[u8]) -> Option<DashboardSummaryRespons
 
 fn encode_daemon(output: &mut Vec<u8>, daemon: DaemonMetrics) {
     put_u32(output, daemon.pid);
+    put_u8(output, u8::from(daemon.rates_available));
     put_u32(output, daemon.cpu_milli_percent);
     put_u64(output, daemon.rss_kib);
     put_u64(output, daemon.read_bytes_per_sec);
@@ -137,6 +138,7 @@ fn encode_daemon(output: &mut Vec<u8>, daemon: DaemonMetrics) {
 fn decode_daemon(reader: &mut Reader<'_>) -> Option<DaemonMetrics> {
     Some(DaemonMetrics {
         pid: reader.u32()?,
+        rates_available: decode_bool(reader.u8()?)?,
         cpu_milli_percent: reader.u32()?,
         rss_kib: reader.u64()?,
         read_bytes_per_sec: reader.u64()?,
@@ -151,6 +153,7 @@ fn decode_daemon(reader: &mut Reader<'_>) -> Option<DaemonMetrics> {
 fn encode_session(output: &mut Vec<u8>, session: SessionMetrics) {
     put_u32(output, session.session_id);
     put_u32(output, session.process_count);
+    put_u8(output, u8::from(session.rates_available));
     put_u32(output, session.cpu_milli_percent);
     put_u64(output, session.rss_kib);
     put_u64(output, session.read_bytes_per_sec);
@@ -166,6 +169,7 @@ fn decode_session(reader: &mut Reader<'_>) -> Option<SessionMetrics> {
         return None;
     }
     let process_count = reader.u32()?;
+    let rates_available = decode_bool(reader.u8()?)?;
     let cpu_milli_percent = reader.u32()?;
     let rss_kib = reader.u64()?;
     let read_bytes_per_sec = reader.u64()?;
@@ -182,6 +186,7 @@ fn decode_session(reader: &mut Reader<'_>) -> Option<SessionMetrics> {
     Some(SessionMetrics {
         session_id,
         process_count,
+        rates_available,
         cpu_milli_percent,
         rss_kib,
         read_bytes_per_sec,
@@ -190,6 +195,14 @@ fn decode_session(reader: &mut Reader<'_>) -> Option<SessionMetrics> {
         writer_active,
         collection_status: decode_collection_status(reader.u8()?)?,
     })
+}
+
+fn decode_bool(value: u8) -> Option<bool> {
+    match value {
+        0 => Some(false),
+        1 => Some(true),
+        _ => None,
+    }
 }
 
 pub fn encode_trend_response(response: &DashboardTrendResponse) -> Vec<u8> {

@@ -30,6 +30,7 @@ pub struct DashboardSummaryRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DaemonMetrics {
     pub pid: u32,
+    pub rates_available: bool,
     pub cpu_milli_percent: u32,
     pub rss_kib: u64,
     pub read_bytes_per_sec: u64,
@@ -44,6 +45,7 @@ pub struct DaemonMetrics {
 pub struct SessionMetrics {
     pub session_id: u32,
     pub process_count: u32,
+    pub rates_available: bool,
     pub cpu_milli_percent: u32,
     pub rss_kib: u64,
     pub read_bytes_per_sec: u64,
@@ -143,6 +145,7 @@ mod tests {
             completeness: Completeness::Partial,
             daemon: DaemonMetrics {
                 pid: 7,
+                rates_available: true,
                 cpu_milli_percent: 12_345,
                 rss_kib: 4_096,
                 read_bytes_per_sec: 100,
@@ -155,6 +158,7 @@ mod tests {
             sessions: vec![SessionMetrics {
                 session_id: 9,
                 process_count: 3,
+                rates_available: true,
                 cpu_milli_percent: 250_000,
                 rss_kib: 8_192,
                 read_bytes_per_sec: 300,
@@ -166,7 +170,7 @@ mod tests {
             next_cursor: Some(43),
         };
         let encoded = encode_summary_response(&response);
-        assert_eq!(decode_summary_response(&encoded), Some(response));
+        assert_eq!(decode_summary_response(&encoded), Some(response.clone()));
         assert!(decode_summary_response(&encoded[..encoded.len() - 1]).is_none());
         let mut trailing = encoded.clone();
         trailing.push(0);
@@ -174,6 +178,16 @@ mod tests {
         let mut invalid_status = encoded;
         *invalid_status.last_mut().expect("session status") = 9;
         assert!(decode_summary_response(&invalid_status).is_none());
+        let mut invalid_daemon_rates = encode_summary_response(&response);
+        const DAEMON_RATES_OFFSET: usize = 8 + 1 + 4 + 4;
+        invalid_daemon_rates[DAEMON_RATES_OFFSET] = 2;
+        assert!(decode_summary_response(&invalid_daemon_rates).is_none());
+        let mut invalid_session_rates = encode_summary_response(&response);
+        let mut without_sessions = response.clone();
+        without_sessions.sessions.clear();
+        let session_start = encode_summary_response(&without_sessions).len();
+        invalid_session_rates[session_start + 8] = 2;
+        assert!(decode_summary_response(&invalid_session_rates).is_none());
     }
 
     #[test]
@@ -227,6 +241,7 @@ mod tests {
         let session = SessionMetrics {
             session_id: 1,
             process_count: 2,
+            rates_available: false,
             cpu_milli_percent: 3,
             rss_kib: 4,
             read_bytes_per_sec: 5,
@@ -240,6 +255,7 @@ mod tests {
             completeness: Completeness::Stale,
             daemon: DaemonMetrics {
                 pid: 1,
+                rates_available: false,
                 cpu_milli_percent: 2,
                 rss_kib: 3,
                 read_bytes_per_sec: 4,

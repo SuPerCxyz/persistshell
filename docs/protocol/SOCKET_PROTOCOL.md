@@ -185,6 +185,7 @@ u32 next_cursor        # u32::MAX 表示没有下一页
 
 daemon:
   u32 pid
+  u8  rates_available  # 0 或 1
   u32 cpu_milli_percent
   u64 rss_kib
   u64 read_bytes_per_sec
@@ -198,6 +199,7 @@ u16 session_count      # 0..128
 sessions[]:
   u32 session_id       # 非零
   u32 process_count
+  u8  rates_available  # 0 或 1
   u32 cpu_milli_percent
   u64 rss_kib
   u64 read_bytes_per_sec
