@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 use super::format::MinuteRecord;
-use super::storage::{MetricStorage, StorageLimits};
+use super::storage::{LoadReport, MetricStorage, StorageLimits};
 
 pub(super) const WRITER_QUEUE_CAPACITY: usize = 2;
 
@@ -18,10 +18,15 @@ pub(super) struct WriterStatus {
 }
 
 pub(super) struct WriterThread {
-    pub sender: SyncSender<MinuteRecord>,
+    pub sender: SyncSender<WriterCommand>,
     pub status: Arc<Mutex<WriterStatus>>,
     pub completion: Receiver<()>,
     pub handle: JoinHandle<()>,
+}
+
+pub(super) enum WriterCommand {
+    Append(MinuteRecord),
+    Load(SyncSender<Option<LoadReport>>),
 }
 
 pub(super) fn spawn_writer(path: PathBuf, limits: StorageLimits) -> WriterThread {
@@ -44,15 +49,15 @@ pub(super) fn spawn_writer(path: PathBuf, limits: StorageLimits) -> WriterThread
 fn run_writer(
     path: PathBuf,
     limits: StorageLimits,
-    receiver: Receiver<MinuteRecord>,
+    receiver: Receiver<WriterCommand>,
     status: &Mutex<WriterStatus>,
 ) {
     let Ok(mut storage) = MetricStorage::open(&path, limits) else {
-        receiver.iter().for_each(drop);
+        drain_unavailable(receiver);
         return;
     };
     let Ok(report) = storage.load() else {
-        receiver.iter().for_each(drop);
+        drain_unavailable(receiver);
         return;
     };
     let mut last_timestamp = report.records.last().map(|record| record.timestamp_ms);
@@ -66,17 +71,32 @@ fn run_writer(
             write_failures: 0,
         },
     );
-    for record in receiver {
-        if last_timestamp == Some(record.timestamp_ms) {
-            continue;
-        }
-        match storage.append(&record) {
-            Ok(()) => last_timestamp = Some(record.timestamp_ms),
-            Err(_) => record_failure(status),
+    for command in receiver {
+        match command {
+            WriterCommand::Append(record) => {
+                if last_timestamp == Some(record.timestamp_ms) {
+                    continue;
+                }
+                match storage.append(&record) {
+                    Ok(()) => last_timestamp = Some(record.timestamp_ms),
+                    Err(_) => record_failure(status),
+                }
+            }
+            WriterCommand::Load(reply) => {
+                let _ = reply.send(storage.load().ok());
+            }
         }
     }
     if storage.flush().is_err() {
         record_failure(status);
+    }
+}
+
+fn drain_unavailable(receiver: Receiver<WriterCommand>) {
+    for command in receiver {
+        if let WriterCommand::Load(reply) = command {
+            let _ = reply.send(None);
+        }
     }
 }
 

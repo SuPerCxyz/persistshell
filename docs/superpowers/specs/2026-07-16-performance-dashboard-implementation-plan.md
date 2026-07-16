@@ -7,7 +7,7 @@
 - [x] 阶段 3：单次 `/proc` 进程树聚合
 - [x] 阶段 4：版本化小时分段
 - [x] 阶段 5：Worker 与 Daemon 生命周期
-- [ ] 阶段 6：Daemon Dashboard IPC
+- [x] 阶段 6：Daemon Dashboard IPC
 - [ ] 阶段 7：CLI 数据客户端与命令入口
 - [ ] 阶段 8：Ratatui 全屏界面
 - [ ] 阶段 9：性能、文档与发布验证

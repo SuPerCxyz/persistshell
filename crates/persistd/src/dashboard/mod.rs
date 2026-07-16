@@ -3,6 +3,8 @@
 mod aggregate;
 mod format;
 mod history;
+mod ipc;
+mod ipc_disk;
 mod model;
 mod proc_source;
 mod procfs;
@@ -12,6 +14,7 @@ mod storage_security;
 mod worker;
 mod writer;
 
+pub(crate) use ipc::{unavailable_summary, unavailable_trend, DashboardService};
 pub(crate) use procfs::SessionRoot;
 pub(crate) use worker::{DashboardRuntime, SampleRequest, SAMPLE_INTERVAL};
 
@@ -20,6 +23,8 @@ mod format_tests;
 
 #[cfg(test)]
 mod history_tests;
+#[cfg(test)]
+mod ipc_tests;
 #[cfg(test)]
 mod model_tests;
 #[cfg(test)]

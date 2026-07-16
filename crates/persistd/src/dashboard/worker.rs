@@ -12,7 +12,7 @@ use super::model::{derive_sample, RawDaemonSample, RawSample};
 use super::proc_source::RealProcSource;
 use super::procfs::{collect_procfs_until, ProcSource, SessionRoot, MAX_PROC_ENTRIES};
 use super::storage::StorageLimits;
-use super::writer::{spawn_writer, WriterStatus, WriterThread};
+use super::writer::{spawn_writer, WriterCommand, WriterStatus, WriterThread};
 
 pub(super) const SAMPLE_QUEUE_CAPACITY: usize = 1;
 pub(crate) const SAMPLE_INTERVAL: Duration = Duration::from_secs(5);
@@ -47,7 +47,7 @@ pub(crate) struct DashboardRuntime {
     trigger: Option<SyncSender<SampleRequest>>,
     worker_completion: Receiver<()>,
     worker_handle: Option<JoinHandle<()>>,
-    writer: Option<WriterThread>,
+    pub(super) writer: Option<WriterThread>,
     pub(super) shared: Arc<SharedDashboard>,
 }
 
@@ -144,7 +144,7 @@ impl Drop for DashboardRuntime {
 fn run_worker(
     source: Box<dyn ProcSource + Send>,
     receiver: Receiver<SampleRequest>,
-    writer: SyncSender<MinuteRecord>,
+    writer: SyncSender<WriterCommand>,
     shared: &SharedDashboard,
 ) {
     let daemon_pid = std::process::id();
@@ -281,11 +281,11 @@ fn update_worker_status_ref(shared: &SharedDashboard, update: impl FnOnce(&mut W
 }
 
 pub(super) fn send_minute(
-    writer: &SyncSender<MinuteRecord>,
+    writer: &SyncSender<WriterCommand>,
     record: MinuteRecord,
     shared: &SharedDashboard,
 ) {
-    if writer.try_send(record).is_err() {
+    if writer.try_send(WriterCommand::Append(record)).is_err() {
         update_worker_status_ref(shared, |status| {
             status.dropped_writes = status.dropped_writes.saturating_add(1);
         });

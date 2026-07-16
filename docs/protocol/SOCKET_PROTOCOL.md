@@ -176,6 +176,11 @@ u32 cursor
 u16 limit              # 1..128，u32::MAX 不是合法 cursor
 ```
 
+`cursor=0` 表示第一页；非零 cursor 必须是上一页最后一个 Session ID。服务端按 Session ID
+升序返回下一页，`next_cursor` 在仍有后续数据时等于本页最后一个 Session ID。游标失效、请求
+解码失败或 Dashboard 不可用时，服务端仍返回对应响应类型，并将 `completeness` 设为
+`unavailable`、数据列表置空；连接保持可用。
+
 `DASHBOARD_SUMMARY_RESP`：
 
 ```text
@@ -241,6 +246,9 @@ points[]:
 
 CPU 单位是千分之一百分点，`100% = 100000`。实时 I/O 是 bytes/s，趋势 I/O 是对应时间桶累计
 bytes。Dashboard payload 不包含命令、输出、环境变量、路径或进程命令行。
+
+15 分钟和 1 小时趋势来自内存采样；24 小时趋势通过 writer 串行读取分钟分段，查询失败或超时
+返回 `unavailable`，不会触发新采样。所有趋势响应最多 240 点。
 
 ---
 

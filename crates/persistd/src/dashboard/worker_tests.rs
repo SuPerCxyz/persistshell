@@ -9,6 +9,7 @@ use super::history::BoundedHistory;
 use super::procfs::ProcSource;
 use super::storage::StorageLimits;
 use super::worker::*;
+use super::writer::WriterCommand;
 
 struct EmptySource;
 
@@ -159,7 +160,9 @@ fn collector_panic_is_contained_and_reported() {
 #[test]
 fn full_writer_queue_drops_batch_and_updates_status() {
     let (sender, _receiver) = mpsc::sync_channel(1);
-    sender.try_send(minute(60_000)).unwrap();
+    sender
+        .try_send(WriterCommand::Append(minute(60_000)))
+        .unwrap();
     let shared = SharedDashboard {
         history: std::sync::RwLock::new(BoundedHistory::new()),
         worker_status: Mutex::new(WorkerStatus::default()),

@@ -3,7 +3,7 @@ use persist_ipc::{CollectionStatus, Completeness, DaemonMetrics, SessionMetrics,
 use super::history::*;
 use super::model::*;
 
-fn sample(monotonic_ms: u64, cpu: u32, session_count: usize) -> DerivedSample {
+pub(super) fn sample(monotonic_ms: u64, cpu: u32, session_count: usize) -> DerivedSample {
     let rates = DaemonMetrics {
         pid: 10,
         rates_available: true,

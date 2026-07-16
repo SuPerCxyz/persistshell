@@ -22,7 +22,7 @@ M52：Performance dashboard
 
 ## 当前唯一任务
 
-M52 阶段 6：使用 TDD 实现 daemon Dashboard summary/trend IPC，不实现 CLI 或 TUI。
+M52 阶段 7：使用 TDD 实现 `persist top` 命令入口和 Dashboard 数据客户端，不实现全屏 TUI。
 
 ### 前置已完成
 
@@ -38,30 +38,32 @@ M52 阶段 6：使用 TDD 实现 daemon Dashboard summary/trend IPC，不实现 
   轮转。
 - 阶段 5 worker 与 daemon 生命周期已完成，包含容量 1/2 队列、5 秒触发、2 秒截止、分钟
   writer、启动恢复、故障隔离和有界 shutdown。
+- 阶段 6 daemon Dashboard IPC 已完成，包含稳定 summary 分页、15m/1h 内存趋势、24h 分段
+  趋势、writer 串行查询、Unavailable 降级和真实 socket 集成测试。
 
 ---
 
 ## 任务范围
 
-- 在 daemon 中处理 `DashboardSummary` 和 `DashboardTrend` 请求及对应响应。
-- summary 使用稳定 Session ID 顺序分页，限制每页最多 128 条并正确生成 `next_cursor`。
-- 15 分钟和 1 小时趋势读取有界内存历史，24 小时趋势读取有效分钟分段。
-- 趋势按 scope/range 聚合且最多返回 240 点，非法 Session、游标、范围和点数返回明确错误。
-- 查询使用共享只读状态或独立存储读取，不触发采样，不持有 `SessionManager` 锁执行磁盘 I/O。
+- 按已确认版本添加 `ratatui 0.29.0` 和 `crossterm 0.28.1`，仅加入 CLI crate。
+- 解析 `persist top` 并更新 help/completion/man page；非 TTY 时返回稳定可诊断错误。
+- 实现 Dashboard client，读取全部 summary 页并请求 daemon/Session 的 15m、1h、24h 趋势。
+- 每次请求限制在 128 个 Session/页和 240 个趋势点，校验响应类型、request ID 和游标推进。
+- 实现 5 秒刷新节拍及有上限的断线重连退避，不做 busy loop；本阶段用最小占位渲染验证数据流。
 
 ---
 
 ## 完成标准
 
-1. IPC 测试覆盖 summary 空数据、单页、多页、稳定游标和超限请求。
-2. 趋势测试覆盖 daemon/Session、15m/1h/24h、未知 Session、空历史和最多 240 点。
-3. 响应不包含命令、输出、环境变量、cwd、note、tag 或其它敏感 Session 内容。
-4. 损坏或不可用磁盘历史只使 24 小时趋势降级，不影响实时 summary 和 daemon 服务。
-5. `cargo test -p persistd`、IPC 回归、格式检查和定向 Clippy 通过。
+1. CLI 测试覆盖 help、未知参数、非 TTY、daemon 不可用、分页和协议响应校验。
+2. 数据客户端测试覆盖多页去重/推进、趋势点上限、断线、过期 request ID 和错误消息类型。
+3. 重连退避和刷新等待有上限且不忙循环，不改变 `persist metrics` 或其它命令行为。
+4. man page、shell completion 和用户手册先记录 `persist top` 命令入口及当前阶段限制。
+5. `cargo test -p persist-cli`、工作区检查、格式检查和定向 Clippy 通过。
 
 ---
 
 ## 禁止事项
 
-不得实现 CLI 或 TUI，不得修改 metadata schema 或 `persist metrics` 语义，不得让查询触发采样，
-不得扩大既有 IPC 帧和分页上限，不得新增依赖。远端 push 仍须维护者授权。
+不得实现阶段 8 的全屏布局、图表或终端 raw/alternate-screen 生命周期，不得修改 metadata schema
+或 `persist metrics` 语义，不得扩大 IPC 上限。远端 push 仍须维护者授权。

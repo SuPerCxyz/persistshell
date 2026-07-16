@@ -22,6 +22,8 @@
   owner/symlink 检查，并限制为 24 个分段、128 MiB 总容量和 1 MiB 单记录。
 - 新增 daemon 内置 Dashboard worker 和独立 writer，以容量 1/2 的非阻塞队列每 5 秒采样，
   单轮 2 秒截止；procfs、分钟落盘、启动恢复和有界退出均不阻塞 accept、PTY 或 GC 路径。
+- 新增 daemon Dashboard summary/trend IPC：Session ID 稳定分页，15 分钟/1 小时内存趋势和
+  24 小时分段趋势均限制为 240 点；磁盘读取经 writer 串行化，错误返回 Unavailable。
 - 新增 `persist ls` TTY 交互选择、`persist ls <id>` 直接菜单和 `--plain` 脚本模式；历史页按
   最新优先每页 50 条显示，并可返回菜单、attach 或退出。
 - 新增有界结构化 Shell 命令历史、受限 stdin helper，以及不修改 dotfile 的 bash/zsh/fish

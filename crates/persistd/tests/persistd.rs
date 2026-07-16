@@ -4,8 +4,10 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use persist_ipc::{
-    decode_attach_resp, decode_list_sessions_resp, decode_new_session_resp, encode_attach,
-    read_frame, write_frame, AttachPayload, ClientSocket, Frame, MessageType,
+    decode_attach_resp, decode_list_sessions_resp, decode_new_session_resp,
+    decode_summary_response, decode_trend_response, encode_attach, encode_summary_request,
+    read_frame, write_frame, AttachPayload, ClientSocket, Completeness, DashboardSummaryRequest,
+    Frame, MessageType,
 };
 use persist_metadata::MetadataStore;
 
@@ -116,6 +118,42 @@ fn foreground_serves_ipc_and_cleans_up_on_sigterm() {
         .send_hello(unsafe { libc::getuid() }, std::process::id())
         .expect("hello");
     assert_eq!(ack.status, persist_ipc::HelloStatus::Accepted);
+    write_frame(
+        client.stream(),
+        &Frame {
+            msg_type: MessageType::DashboardSummary,
+            flags: 0,
+            request_id: 41,
+            payload: encode_summary_request(&DashboardSummaryRequest {
+                cursor: 0,
+                limit: 128,
+            }),
+        },
+    )
+    .expect("dashboard summary");
+    let response = read_frame(client.stream()).expect("dashboard summary response");
+    assert_eq!(response.msg_type, MessageType::DashboardSummaryResp);
+    assert_eq!(response.request_id, 41);
+    let summary = decode_summary_response(&response.payload).expect("decode dashboard summary");
+    assert!(summary.sessions.len() <= 128);
+
+    write_frame(
+        client.stream(),
+        &Frame {
+            msg_type: MessageType::DashboardTrend,
+            flags: 0,
+            request_id: 42,
+            payload: vec![0xFF],
+        },
+    )
+    .expect("invalid dashboard trend");
+    let response = read_frame(client.stream()).expect("invalid dashboard trend response");
+    assert_eq!(response.msg_type, MessageType::DashboardTrendResp);
+    assert_eq!(response.request_id, 42);
+    let trend = decode_trend_response(&response.payload).expect("decode unavailable trend");
+    assert_eq!(trend.completeness, Completeness::Unavailable);
+    assert!(trend.points.is_empty());
+
     write_frame(
         client.stream(),
         &Frame {

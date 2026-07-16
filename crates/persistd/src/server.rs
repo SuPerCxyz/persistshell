@@ -24,23 +24,27 @@ use persist_core::{
 use persist_ipc::{
     decode_attach, decode_attach_resp, decode_detach, decode_hello, decode_list_sessions_resp,
     decode_lock, decode_new_session_resp, decode_note, decode_note_get_resp, decode_op_resp,
-    decode_pin, decode_rename, decode_resize, decode_signal, decode_tag, decode_tag_list_resp,
-    encode_attach, encode_attach_resp, encode_detach, encode_hello, encode_hello_ack,
-    encode_list_sessions_resp, encode_new_session_resp, encode_note, encode_note_get_resp,
-    encode_op_resp, encode_pin, encode_process_stats_resp, encode_process_tree_resp, encode_resize,
-    encode_session_exited, encode_signal, encode_tag, encode_tag_list_resp, encode_writer_control,
-    read_frame, write_frame, AttachPayload, AttachRespPayload, DaemonConnection, DaemonSocket,
-    DetachPayload, Frame, FrameAccumulator, HelloAckPayload, HelloPayload, HelloStatus,
-    ListSessionsRespPayload, MessageType, NewSessionRespPayload, NotePayload, OpRespPayload,
-    PinPayload, ProcessStatsRespPayload, ProcessTreeNode, ProcessTreeRespPayload, ResizePayload,
-    SessionEntry, SessionExitedPayload, SignalPayload, TagListRespPayload, TagPayload,
-    WriterControlPayload, MAX_IO_FRAME,
+    decode_pin, decode_rename, decode_resize, decode_signal, decode_summary_request, decode_tag,
+    decode_tag_list_resp, decode_trend_request, encode_attach, encode_attach_resp, encode_detach,
+    encode_hello, encode_hello_ack, encode_list_sessions_resp, encode_new_session_resp,
+    encode_note, encode_note_get_resp, encode_op_resp, encode_pin, encode_process_stats_resp,
+    encode_process_tree_resp, encode_resize, encode_session_exited, encode_signal,
+    encode_summary_response, encode_tag, encode_tag_list_resp, encode_trend_response,
+    encode_writer_control, read_frame, write_frame, AttachPayload, AttachRespPayload,
+    DaemonConnection, DaemonSocket, DetachPayload, Frame, FrameAccumulator, HelloAckPayload,
+    HelloPayload, HelloStatus, ListSessionsRespPayload, MessageType, NewSessionRespPayload,
+    NotePayload, OpRespPayload, PinPayload, ProcessStatsRespPayload, ProcessTreeNode,
+    ProcessTreeRespPayload, ResizePayload, SessionEntry, SessionExitedPayload, SignalPayload,
+    TagListRespPayload, TagPayload, WriterControlPayload, MAX_IO_FRAME,
 };
 use persist_metadata::MetadataStore;
 use persist_pty::pty::detect_shell;
 use persist_pty::{PtyEngine, PtySession};
 
-use crate::dashboard::{DashboardRuntime, SampleRequest, SessionRoot, SAMPLE_INTERVAL};
+use crate::dashboard::{
+    unavailable_summary, unavailable_trend, DashboardRuntime, DashboardService, SampleRequest,
+    SessionRoot, SAMPLE_INTERVAL,
+};
 use crate::log_writer::{spawn_session_logger, SessionLogHandle};
 
 pub fn run<I>(args: I) -> ExitCode
@@ -159,6 +163,7 @@ fn run_foreground(idle_timeout: Option<std::time::Duration>) -> Result<()> {
     let gc_interval = config.daemon.gc_interval.duration();
     let mut next_gc = std::time::Instant::now() + gc_interval;
     let mut dashboard = DashboardRuntime::start(config.paths.state_dir.join("metrics"));
+    let dashboard_service = dashboard.service();
     let mut next_dashboard_sample = Instant::now();
 
     while !crate::lifecycle::shutdown_requested() {
@@ -166,8 +171,9 @@ fn run_foreground(idle_timeout: Option<std::time::Duration>) -> Result<()> {
             Ok(Some(conn)) => {
                 let sm = sm.clone();
                 let metadata = metadata.clone();
+                let dashboard = dashboard_service.clone();
                 std::thread::spawn(move || {
-                    let _ = handle_client(conn, sm, Some(metadata), 0);
+                    let _ = handle_client(conn, sm, Some(metadata), Some(dashboard), 0);
                 });
             }
             Ok(None) => {}
@@ -870,6 +876,7 @@ fn handle_client(
     mut conn: DaemonConnection,
     sm: Arc<Mutex<SessionManager>>,
     ms: Option<Arc<Mutex<MetadataStore>>>,
+    dashboard: Option<DashboardService>,
     _ring_buf_size: usize,
 ) -> Result<()> {
     let stream = conn.stream();
@@ -1245,6 +1252,42 @@ fn handle_client(
                             flags: 0,
                             request_id: 0,
                             payload: encode_note_get_resp(&json),
+                        },
+                    );
+                }
+                MessageType::DashboardSummary => {
+                    let response = decode_summary_request(&frame.payload)
+                        .and_then(|request| {
+                            dashboard
+                                .as_ref()
+                                .and_then(|service| service.summary(request).ok())
+                        })
+                        .unwrap_or_else(unavailable_summary);
+                    let _ = write_frame(
+                        stream,
+                        &Frame {
+                            msg_type: MessageType::DashboardSummaryResp,
+                            flags: 0,
+                            request_id: frame.request_id,
+                            payload: encode_summary_response(&response),
+                        },
+                    );
+                }
+                MessageType::DashboardTrend => {
+                    let response = decode_trend_request(&frame.payload)
+                        .and_then(|request| {
+                            dashboard
+                                .as_ref()
+                                .and_then(|service| service.trend(request).ok())
+                        })
+                        .unwrap_or_else(unavailable_trend);
+                    let _ = write_frame(
+                        stream,
+                        &Frame {
+                            msg_type: MessageType::DashboardTrendResp,
+                            flags: 0,
+                            request_id: frame.request_id,
+                            payload: encode_trend_response(&response),
                         },
                     );
                 }
@@ -2475,7 +2518,7 @@ mod tests {
         let sm_server = sm.clone();
         let server = std::thread::spawn(move || {
             if let Ok(conn) = daemon.accept() {
-                let _ = handle_client(conn, sm_server, None, 0);
+                let _ = handle_client(conn, sm_server, None, None, 0);
             }
         });
 
@@ -2586,7 +2629,7 @@ mod tests {
         let sm_server = sm.clone();
         let server = std::thread::spawn(move || {
             if let Ok(conn) = daemon.accept() {
-                let _ = handle_client(conn, sm_server, None, 0);
+                let _ = handle_client(conn, sm_server, None, None, 0);
             }
         });
 
@@ -2689,7 +2732,7 @@ mod tests {
         let ms_server = ms.clone();
         let server = std::thread::spawn(move || {
             if let Ok(conn) = daemon.accept() {
-                let _ = handle_client(conn, sm_server, Some(ms_server), 0);
+                let _ = handle_client(conn, sm_server, Some(ms_server), None, 0);
             }
         });
 
@@ -2836,7 +2879,7 @@ mod tests {
         let ms_server = ms.clone();
         let server = std::thread::spawn(move || {
             if let Ok(conn) = daemon.accept() {
-                let _ = handle_client(conn, sm_server, Some(ms_server), 0);
+                let _ = handle_client(conn, sm_server, Some(ms_server), None, 0);
             }
         });
 
@@ -3022,7 +3065,7 @@ mod tests {
         let ms_server = ms.clone();
         let server = std::thread::spawn(move || {
             if let Ok(conn) = daemon.accept() {
-                let _ = handle_client(conn, sm_server, Some(ms_server), 0);
+                let _ = handle_client(conn, sm_server, Some(ms_server), None, 0);
             }
         });
 
@@ -3228,7 +3271,7 @@ mod tests {
         let sm_server = sm.clone();
         let server = std::thread::spawn(move || {
             if let Ok(conn) = daemon.accept() {
-                let _ = handle_client(conn, sm_server, None, 0);
+                let _ = handle_client(conn, sm_server, None, None, 0);
             }
         });
 
@@ -3392,7 +3435,7 @@ mod tests {
         let ms_server = ms.clone();
         let server = std::thread::spawn(move || {
             if let Ok(conn) = daemon.accept() {
-                let _ = handle_client(conn, sm_server, Some(ms_server), 0);
+                let _ = handle_client(conn, sm_server, Some(ms_server), None, 0);
             }
         });
 
@@ -3501,7 +3544,7 @@ mod tests {
         let sm_server = sm.clone();
         let server = std::thread::spawn(move || {
             if let Ok(conn) = daemon.accept() {
-                let _ = handle_client(conn, sm_server, None, 0);
+                let _ = handle_client(conn, sm_server, None, None, 0);
             }
         });
 
@@ -3744,7 +3787,7 @@ mod tests {
                 let conn = daemon.accept().expect("accept client");
                 let client_sm = server_sm.clone();
                 handlers.push(std::thread::spawn(move || {
-                    let _ = handle_client(conn, client_sm, None, 0);
+                    let _ = handle_client(conn, client_sm, None, None, 0);
                 }));
             }
             for handler in handlers {
@@ -3980,7 +4023,7 @@ mod tests {
                 if let Ok(conn) = daemon.accept() {
                     let sm = daemon_sm.clone();
                     handles.push(std::thread::spawn(move || {
-                        let _ = handle_client(conn, sm, None, 0);
+                        let _ = handle_client(conn, sm, None, None, 0);
                     }));
                 }
             }
@@ -4124,7 +4167,7 @@ mod tests {
                 let sm = daemon_sm.clone();
                 let tx = conn_done_tx.clone();
                 std::thread::spawn(move || {
-                    let _ = handle_client(conn, sm, None, 0);
+                    let _ = handle_client(conn, sm, None, None, 0);
                     let _ = tx.send(());
                 });
             } else {

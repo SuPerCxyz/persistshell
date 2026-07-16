@@ -10,10 +10,14 @@ use super::writer::*;
 #[test]
 fn writer_queue_has_hard_capacity() {
     let (sender, _receiver) = std::sync::mpsc::sync_channel(WRITER_QUEUE_CAPACITY);
-    sender.try_send(minute(1_000)).unwrap();
-    sender.try_send(minute(2_000)).unwrap();
+    sender
+        .try_send(WriterCommand::Append(minute(1_000)))
+        .unwrap();
+    sender
+        .try_send(WriterCommand::Append(minute(2_000)))
+        .unwrap();
     assert!(matches!(
-        sender.try_send(minute(3_000)),
+        sender.try_send(WriterCommand::Append(minute(3_000))),
         Err(TrySendError::Full(_))
     ));
 }
@@ -27,9 +31,29 @@ fn writer_loads_deduplicates_and_flushes_on_disconnect() {
     drop(initial);
 
     let writer = spawn_writer(path.clone(), StorageLimits::default());
-    writer.sender.send(minute(60_000)).unwrap();
-    writer.sender.send(minute(120_000)).unwrap();
-    writer.sender.send(minute(30_000)).unwrap();
+    writer
+        .sender
+        .send(WriterCommand::Append(minute(60_000)))
+        .unwrap();
+    writer
+        .sender
+        .send(WriterCommand::Append(minute(120_000)))
+        .unwrap();
+    writer
+        .sender
+        .send(WriterCommand::Append(minute(30_000)))
+        .unwrap();
+    let (reply, response) = std::sync::mpsc::sync_channel(1);
+    writer.sender.send(WriterCommand::Load(reply)).unwrap();
+    assert_eq!(
+        response
+            .recv_timeout(Duration::from_secs(1))
+            .unwrap()
+            .unwrap()
+            .records
+            .len(),
+        3
+    );
     drop(writer.sender);
     writer
         .completion
@@ -52,7 +76,7 @@ fn unavailable_storage_drains_and_exits_without_panicking() {
     fs::create_dir(&path).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
     let writer = spawn_writer(path, StorageLimits::default());
-    let _ = writer.sender.send(minute(60_000));
+    let _ = writer.sender.send(WriterCommand::Append(minute(60_000)));
     drop(writer.sender);
     writer
         .completion
