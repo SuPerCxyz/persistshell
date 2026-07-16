@@ -22,7 +22,7 @@ M52：Performance dashboard
 
 ## 当前唯一任务
 
-M52 阶段 3：使用 TDD 实现单次 `/proc` 进程树聚合，不接入磁盘、daemon 生命周期或 TUI。
+M52 阶段 4：使用 TDD 实现版本化小时分段存储，不接入 daemon 生命周期或 TUI。
 
 ### 前置已完成
 
@@ -33,30 +33,31 @@ M52 阶段 3：使用 TDD 实现单次 `/proc` 进程树聚合，不接入磁盘
 - 实施计划已拆分为 IPC、内存模型、procfs、存储、worker、daemon、TUI 和验证阶段。
 - 阶段 1 Dashboard IPC 已完成，新增受限 summary/trend 编解码和协议文档。
 - 阶段 2 有界内存模型已完成，包含速率、聚合、64 MiB/1 小时/720 帧硬上限。
+- 阶段 3 单次 procfs 聚合已完成，包含多 Session 归属、失败状态和受限真实 source。
 
 ---
 
 ## 任务范围
 
-- 新增可使用 fixture 的只读 procfs source 和进程记录解析器。
-- 单次枚举 PID、PPID、CPU ticks、RSS 和 I/O，不读取敏感文件。
-- 以各 Session 根 Shell PID 聚合全部后代，防止重复归属。
-- 处理进程消失、权限失败、损坏记录、缺失根 PID 和部分采集。
-- 增加真实 Linux 子进程树定向测试，不依赖脆弱的精确资源值。
+- 定义带 magic、版本、记录长度、时间、payload 和 CRC32 的二进制格式。
+- 限制目录项数量、单文件大小、记录长度和所有解码分配。
+- 安全创建 `0700` 目录和 `0600` 文件，拒绝 symlink、错误 owner 和过宽权限。
+- 实现尾部不完整记录截断、损坏分段跳过、时间回退新分段和重启加载。
+- 实现最多 24 个小时分段及 128 MiB 容量轮转，容量优先。
 
 ---
 
 ## 完成标准
 
-1. 先提交 fixture 失败测试，再完成最小 procfs 实现。
-2. 嵌套树、多个 Session、重复归属和损坏/消失进程测试通过。
-3. unavailable 与 partial 状态准确，不使用伪造零值表示成功。
-4. 扫描实现不访问 `cmdline`、`environ`、`cwd` 或 fd 目标。
+1. 先提交格式与临时目录失败测试，再完成最小存储实现。
+2. round-trip、CRC、截断、未知版本和超限记录测试通过。
+3. 权限、owner、symlink、文件数量和容量边界测试通过。
+4. 损坏或不可写指标存储不修改 metadata，也不导致无界分配。
 5. `cargo test -p persistd`、格式检查和定向 Clippy 通过。
 
 ---
 
 ## 禁止事项
 
-不得接入 daemon 生命周期、磁盘存储或 TUI，不得修改 `persist metrics` 语义，不得读取命令、
-输出、环境变量、路径或进程命令行。远端 push 仍须维护者授权。
+不得接入 daemon 生命周期或 TUI，不得修改 metadata schema 或 `persist metrics` 语义，不得使用
+JSON 时序存储或新增依赖。远端 push 仍须维护者授权。

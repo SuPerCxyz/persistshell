@@ -4,7 +4,7 @@
 
 - [x] 阶段 1：Dashboard IPC
 - [x] 阶段 2：有界内存模型
-- [ ] 阶段 3：单次 `/proc` 进程树聚合
+- [x] 阶段 3：单次 `/proc` 进程树聚合
 - [ ] 阶段 4：版本化小时分段
 - [ ] 阶段 5：Worker 与 Daemon 生命周期
 - [ ] 阶段 6：Daemon Dashboard IPC

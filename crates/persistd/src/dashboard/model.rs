@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use persist_ipc::{CollectionStatus, Completeness, DaemonMetrics, SessionMetrics};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(super) struct RawCounters {
     pub user_ticks: u64,
     pub system_ticks: u64,
