@@ -1,7 +1,27 @@
+use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
 
 fn persist_cmd() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_persist"))
+    let root = test_root();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_persist"));
+    command
+        .env("XDG_CONFIG_HOME", root.join("config"))
+        .env("XDG_DATA_HOME", root.join("data"))
+        .env("XDG_STATE_HOME", root.join("state"))
+        .env("XDG_RUNTIME_DIR", root.join("runtime"));
+    command
+}
+
+fn test_root() -> &'static PathBuf {
+    static ROOT: OnceLock<PathBuf> = OnceLock::new();
+    ROOT.get_or_init(|| {
+        let root = std::env::temp_dir().join(format!("persist_cli_test_{}", std::process::id()));
+        let runtime = root.join("runtime");
+        fs::create_dir_all(&runtime).expect("create CLI test runtime directory");
+        root
+    })
 }
 
 fn run(args: &[&str]) -> (bool, String, String) {
