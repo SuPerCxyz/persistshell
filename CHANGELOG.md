@@ -18,6 +18,8 @@
   64 MiB、1 小时和 720 个时间片，趋势降采样最多 240 点。
 - 新增受限 procfs 单次扫描和多 Session 进程树聚合，按最近根 PID 防止重复归属，限制扫描为
   262,144 个 PID 和单文件 4 KiB，并对消失、损坏和权限失败显式降级。
+- 新增版本化小时指标分段，使用 CRC32 校验、尾部截断恢复、严格 `0700`/`0600` 权限和
+  owner/symlink 检查，并限制为 24 个分段、128 MiB 总容量和 1 MiB 单记录。
 - 新增 `persist ls` TTY 交互选择、`persist ls <id>` 直接菜单和 `--plain` 脚本模式；历史页按
   最新优先每页 50 条显示，并可返回菜单、attach 或退出。
 - 新增有界结构化 Shell 命令历史、受限 stdin helper，以及不修改 dotfile 的 bash/zsh/fish
