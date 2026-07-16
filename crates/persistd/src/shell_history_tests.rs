@@ -107,8 +107,10 @@ fn assert_shell_behavior(shell: &str, shell_name: &str, root: &Path, home: &Path
     let prompt_marker = root.join("prompt-marker");
     let ready_marker = root.join("ready-marker");
     let launch = prepare(shell, 17, root, &helper).unwrap().unwrap();
+    let mut arguments = launch.arguments;
     let mut environment = launch.environment;
     if shell_name == "zsh" {
+        arguments.insert(0, "-d".into());
         set_environment(&mut environment, "PERSIST_ORIGINAL_ZDOTDIR", home);
         set_environment(&mut environment, "PERSIST_ORIGINAL_ZDOTDIR_SET", "1");
     }
@@ -142,7 +144,7 @@ fn assert_shell_behavior(shell: &str, shell_name: &str, root: &Path, home: &Path
             Some(&histfile.to_string_lossy()),
             None,
             &environment,
-            &launch.arguments,
+            &arguments,
         )
         .unwrap();
     wait_for_file_with_pty(&mut session, &ready_marker, "r", Duration::from_secs(30));
