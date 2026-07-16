@@ -1,3 +1,4 @@
+mod dashboard;
 mod lifecycle;
 mod log_writer;
 mod server;

@@ -14,6 +14,8 @@
   1 小时内存趋势、24 小时磁盘聚合及严格资源和隐私边界。
 - 新增 Dashboard summary/trend 二进制 IPC，限制每页 128 个 Session、每次 240 个趋势点，并
   拒绝非法游标、枚举、截断、尾随和超限 payload。
+- 新增 Dashboard 纯内存速率与聚合模型，首点或计数器回退不伪造零速率，并限制历史为
+  64 MiB、1 小时和 720 个时间片，趋势降采样最多 240 点。
 - 新增 `persist ls` TTY 交互选择、`persist ls <id>` 直接菜单和 `--plain` 脚本模式；历史页按
   最新优先每页 50 条显示，并可返回菜单、attach 或退出。
 - 新增有界结构化 Shell 命令历史、受限 stdin helper，以及不修改 dotfile 的 bash/zsh/fish

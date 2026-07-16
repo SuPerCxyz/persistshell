@@ -22,7 +22,7 @@ M52：Performance dashboard
 
 ## 当前唯一任务
 
-M52 阶段 2：使用 TDD 实现 Dashboard 有界内存模型，不接入 `/proc`、磁盘、daemon 或 TUI。
+M52 阶段 3：使用 TDD 实现单次 `/proc` 进程树聚合，不接入磁盘、daemon 生命周期或 TUI。
 
 ### 前置已完成
 
@@ -32,30 +32,31 @@ M52 阶段 2：使用 TDD 实现 Dashboard 有界内存模型，不接入 `/proc
 - M52 中文设计规范已确认，`ADR-0004` 已接受。
 - 实施计划已拆分为 IPC、内存模型、procfs、存储、worker、daemon、TUI 和验证阶段。
 - 阶段 1 Dashboard IPC 已完成，新增受限 summary/trend 编解码和协议文档。
+- 阶段 2 有界内存模型已完成，包含速率、聚合、64 MiB/1 小时/720 帧硬上限。
 
 ---
 
 ## 任务范围
 
-- 新增 daemon dashboard model/history 独立模块，不修改现有 `server.rs` 行为。
-- 定义原始计数、展示速率、分钟聚合、完整性和数据年龄模型。
-- 使用可注入时间测试首点、CPU/I/O 差值、计数器回退和系统时间回退。
-- 实现按时间片组织的环形历史和精确内存容量记账。
-- 达到 64 MiB 后统一淘汰最旧时间片，并实现最多 240 桶降采样。
+- 新增可使用 fixture 的只读 procfs source 和进程记录解析器。
+- 单次枚举 PID、PPID、CPU ticks、RSS 和 I/O，不读取敏感文件。
+- 以各 Session 根 Shell PID 聚合全部后代，防止重复归属。
+- 处理进程消失、权限失败、损坏记录、缺失根 PID 和部分采集。
+- 增加真实 Linux 子进程树定向测试，不依赖脆弱的精确资源值。
 
 ---
 
 ## 完成标准
 
-1. 先提交失败测试，再完成最小内存模型实现。
-2. 首点、差值、回退、聚合、空区间和部分数据测试通过。
-3. 点数、时间窗口和 64 MiB 容量均有硬上限测试。
-4. 淘汰后最新点始终存在，所有 Session 保持相同起始时间片。
+1. 先提交 fixture 失败测试，再完成最小 procfs 实现。
+2. 嵌套树、多个 Session、重复归属和损坏/消失进程测试通过。
+3. unavailable 与 partial 状态准确，不使用伪造零值表示成功。
+4. 扫描实现不访问 `cmdline`、`environ`、`cwd` 或 fd 目标。
 5. `cargo test -p persistd`、格式检查和定向 Clippy 通过。
 
 ---
 
 ## 禁止事项
 
-不得扫描 `/proc`，不得接入 daemon 生命周期、磁盘存储或 TUI，不得修改 `persist metrics`
-语义，不得暴露 Session 内容或敏感数据。远端 push 仍须维护者授权。
+不得接入 daemon 生命周期、磁盘存储或 TUI，不得修改 `persist metrics` 语义，不得读取命令、
+输出、环境变量、路径或进程命令行。远端 push 仍须维护者授权。
