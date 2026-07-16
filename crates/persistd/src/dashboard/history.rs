@@ -3,7 +3,7 @@ use std::mem::size_of;
 
 use persist_ipc::{Completeness, TrendPoint, TrendScope, MAX_TREND_POINTS};
 
-use super::aggregate::{aggregate, TrendSeries};
+use super::aggregate::{aggregate, aggregate_wall, TrendSeries};
 use super::model::{DerivedSample, DerivedSession};
 
 pub(super) const MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
@@ -92,11 +92,32 @@ impl BoundedHistory {
     }
 
     pub(super) fn minute(&self, scope: TrendScope, start_ms: u64) -> Option<TrendPoint> {
-        let end_ms = start_ms.saturating_add(60_000);
-        aggregate(&self.frames, scope, start_ms, end_ms, 1)
+        self.minute_series(scope, start_ms)
             .points
             .into_iter()
             .next()
+    }
+
+    pub(super) fn minute_series(&self, scope: TrendScope, start_ms: u64) -> TrendSeries {
+        let end_ms = start_ms.saturating_add(60_000);
+        aggregate_wall(&self.frames, scope, start_ms, end_ms, 1)
+    }
+
+    pub(super) fn session_ids_wall(&self, start_ms: u64, end_ms: u64) -> Vec<u32> {
+        let mut ids = self
+            .frames
+            .iter()
+            .filter(|sample| sample.sampled_at_ms > start_ms && sample.sampled_at_ms <= end_ms)
+            .flat_map(|sample| {
+                sample
+                    .sessions
+                    .iter()
+                    .map(|session| session.metrics.session_id)
+            })
+            .collect::<Vec<_>>();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
     }
 
     fn limit_sample(&self, sample: &mut DerivedSample) {

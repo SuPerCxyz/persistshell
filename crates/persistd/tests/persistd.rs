@@ -1,3 +1,4 @@
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -99,6 +100,16 @@ fn foreground_serves_ipc_and_cleans_up_on_sigterm() {
     let pid_path = runtime.join("persistshell/daemon.pid");
     wait_for_path(&socket_path, &mut daemon);
     assert!(pid_path.exists());
+    let metrics_path = temp.path().join("state/persistshell/metrics");
+    wait_for_path(&metrics_path, &mut daemon);
+    assert_eq!(
+        std::fs::metadata(&metrics_path)
+            .expect("metrics metadata")
+            .permissions()
+            .mode()
+            & 0o777,
+        0o700
+    );
 
     let mut client = ClientSocket::connect(&socket_path).expect("connect");
     let ack = client

@@ -17,6 +17,31 @@ pub(super) fn aggregate(
     end_ms: u64,
     max_points: u16,
 ) -> TrendSeries {
+    aggregate_by(frames, scope, start_ms, end_ms, max_points, |sample| {
+        sample.monotonic_ms
+    })
+}
+
+pub(super) fn aggregate_wall(
+    frames: &VecDeque<Box<DerivedSample>>,
+    scope: TrendScope,
+    start_ms: u64,
+    end_ms: u64,
+    max_points: u16,
+) -> TrendSeries {
+    aggregate_by(frames, scope, start_ms, end_ms, max_points, |sample| {
+        sample.sampled_at_ms
+    })
+}
+
+fn aggregate_by(
+    frames: &VecDeque<Box<DerivedSample>>,
+    scope: TrendScope,
+    start_ms: u64,
+    end_ms: u64,
+    max_points: u16,
+    timestamp: impl Fn(&DerivedSample) -> u64,
+) -> TrendSeries {
     let width = end_ms
         .saturating_sub(start_ms)
         .div_ceil(u64::from(max_points))
@@ -26,7 +51,7 @@ pub(super) fn aggregate(
     for sample in frames
         .iter()
         .map(Box::as_ref)
-        .filter(|sample| sample.monotonic_ms > start_ms && sample.monotonic_ms <= end_ms)
+        .filter(|sample| timestamp(sample) > start_ms && timestamp(sample) <= end_ms)
     {
         let Some(metric) = metric_for(sample, scope) else {
             continue;
@@ -37,10 +62,7 @@ pub(super) fn aggregate(
         {
             completeness = Completeness::Partial;
         }
-        let elapsed = sample
-            .monotonic_ms
-            .saturating_sub(start_ms)
-            .saturating_sub(1);
+        let elapsed = timestamp(sample).saturating_sub(start_ms).saturating_sub(1);
         let index = (elapsed / width).min(u64::from(max_points - 1)) as usize;
         buckets[index]
             .get_or_insert_with(Accumulator::default)

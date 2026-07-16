@@ -114,6 +114,22 @@ fn minute_aggregate_and_unknown_session_are_explicit() {
 }
 
 #[test]
+fn minute_aggregate_uses_wall_clock_and_lists_observed_sessions() {
+    let mut history = BoundedHistory::with_limits(64 * 1024, 120_000, 8);
+    let mut first = sample(5_000, 1_000, 1);
+    first.sampled_at_ms = 125_000;
+    let mut second = sample(10_000, 3_000, 2);
+    second.sampled_at_ms = 150_000;
+    history.push(first);
+    history.push(second);
+
+    let point = history.minute(TrendScope::Daemon, 120_000).unwrap();
+    assert_eq!(point.cpu_avg_milli_percent, 2_000);
+    assert_eq!(history.session_ids_wall(120_000, 180_000), vec![1, 2]);
+    assert!(history.minute(TrendScope::Daemon, 0).is_none());
+}
+
+#[test]
 fn unavailable_rates_keep_rss_without_fabricating_io() {
     let mut history = BoundedHistory::with_limits(64 * 1024, 60_000, 4);
     let mut first = sample(1_000, 0, 1);

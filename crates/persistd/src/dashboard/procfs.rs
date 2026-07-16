@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::io;
+use std::time::Instant;
 
 use persist_ipc::{CollectionStatus, Completeness};
 
@@ -15,11 +16,11 @@ pub(super) trait ProcSource {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct SessionRoot {
-    pub session_id: u32,
-    pub root_pid: u32,
-    pub foreground_pid: Option<u32>,
-    pub writer_active: bool,
+pub(crate) struct SessionRoot {
+    pub(crate) session_id: u32,
+    pub(crate) root_pid: u32,
+    pub(crate) foreground_pid: Option<u32>,
+    pub(crate) writer_active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,12 +88,28 @@ pub(super) fn collect_procfs(
     page_size: u64,
     max_entries: usize,
 ) -> ProcSnapshot {
+    collect_procfs_until(source, daemon_pid, roots, page_size, max_entries, None)
+}
+
+pub(super) fn collect_procfs_until(
+    source: &dyn ProcSource,
+    daemon_pid: u32,
+    roots: &[SessionRoot],
+    page_size: u64,
+    max_entries: usize,
+    deadline: Option<Instant>,
+) -> ProcSnapshot {
     let Ok((pids, truncated)) = source.list_pids(max_entries) else {
         return unavailable_snapshot(roots);
     };
     let mut records = HashMap::with_capacity(pids.len());
     let mut stat_incomplete = false;
+    let mut timed_out = false;
     for pid in pids {
+        if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
+            timed_out = true;
+            break;
+        }
         let Ok(stat) = source.read_stat(pid) else {
             stat_incomplete = true;
             continue;
@@ -147,7 +164,7 @@ pub(super) fn collect_procfs(
         }
     }
 
-    let global_partial = stat_incomplete || truncated;
+    let global_partial = stat_incomplete || truncated || timed_out;
     for (index, root) in roots.iter().enumerate() {
         if !records.contains_key(&root.root_pid) {
             statuses[index] = CollectionStatus::Unavailable;
@@ -188,7 +205,7 @@ pub(super) fn collect_procfs(
         completeness,
         daemon,
         sessions,
-        truncated,
+        truncated: truncated || timed_out,
     }
 }
 

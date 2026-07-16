@@ -9,6 +9,11 @@ mod procfs;
 mod storage;
 mod storage_reader;
 mod storage_security;
+mod worker;
+mod writer;
+
+pub(crate) use procfs::SessionRoot;
+pub(crate) use worker::{DashboardRuntime, SampleRequest, SAMPLE_INTERVAL};
 
 #[cfg(test)]
 mod format_tests;
@@ -21,3 +26,7 @@ mod model_tests;
 mod procfs_tests;
 #[cfg(test)]
 mod storage_tests;
+#[cfg(test)]
+mod worker_tests;
+#[cfg(test)]
+mod writer_tests;

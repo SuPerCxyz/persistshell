@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::io::{self, BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 
 use persist_ipc::{CollectionStatus, Completeness};
 
@@ -160,6 +161,26 @@ fn scan_limit_and_unattributable_stat_failure_mark_partial() {
     let truncated = collect_procfs(&proc, 10, &[root(1, 10)], 4_096, 1);
     assert_eq!(truncated.completeness, Completeness::Partial);
     assert!(truncated.truncated);
+}
+
+#[test]
+fn expired_deadline_stops_before_reading_process_files() {
+    let mut proc = FakeProc::default();
+    proc.add(10, 1, 1, 1, 1);
+    let snapshot = collect_procfs_until(
+        &proc,
+        10,
+        &[root(1, 10)],
+        4_096,
+        100,
+        Some(Instant::now() - Duration::from_millis(1)),
+    );
+    assert!(snapshot.truncated);
+    assert_eq!(snapshot.completeness, Completeness::Unavailable);
+    assert_eq!(
+        snapshot.sessions[0].collection_status,
+        CollectionStatus::Unavailable
+    );
 }
 
 #[test]

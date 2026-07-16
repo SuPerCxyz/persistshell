@@ -16,7 +16,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use persist_core::{
     init_logging, load_config, version_string, ConfigLoadOptions, PersistError, Result, RingBuffer,
@@ -40,6 +40,7 @@ use persist_metadata::MetadataStore;
 use persist_pty::pty::detect_shell;
 use persist_pty::{PtyEngine, PtySession};
 
+use crate::dashboard::{DashboardRuntime, SampleRequest, SessionRoot, SAMPLE_INTERVAL};
 use crate::log_writer::{spawn_session_logger, SessionLogHandle};
 
 pub fn run<I>(args: I) -> ExitCode
@@ -157,6 +158,8 @@ fn run_foreground(idle_timeout: Option<std::time::Duration>) -> Result<()> {
     sm.lock().unwrap().set_gc_idle_timeout(gc_timeout);
     let gc_interval = config.daemon.gc_interval.duration();
     let mut next_gc = std::time::Instant::now() + gc_interval;
+    let mut dashboard = DashboardRuntime::start(config.paths.state_dir.join("metrics"));
+    let mut next_dashboard_sample = Instant::now();
 
     while !crate::lifecycle::shutdown_requested() {
         match socket.accept_timeout(Duration::from_millis(250)) {
@@ -169,6 +172,11 @@ fn run_foreground(idle_timeout: Option<std::time::Duration>) -> Result<()> {
             }
             Ok(None) => {}
             Err(error) => eprintln!("persistd: {error}"),
+        }
+        if Instant::now() >= next_dashboard_sample {
+            let request = sm.lock().unwrap().dashboard_sample_request();
+            let _ = dashboard.try_trigger(request);
+            next_dashboard_sample = Instant::now() + SAMPLE_INTERVAL;
         }
         if !gc_timeout.is_zero() && std::time::Instant::now() >= next_gc {
             let metadata = metadata.clone();
@@ -204,6 +212,7 @@ fn run_foreground(idle_timeout: Option<std::time::Duration>) -> Result<()> {
         }
     }
 
+    dashboard.shutdown();
     drop(socket);
     drop(pidfile);
     Ok(())
@@ -468,6 +477,10 @@ fn metrics_json(value: serde_json::Value) -> String {
     )
 }
 
+fn saturating_u32(value: usize) -> u32 {
+    u32::try_from(value).unwrap_or(u32::MAX)
+}
+
 impl SessionManager {
     fn new(
         ring_buffer_size: usize,
@@ -512,6 +525,29 @@ impl SessionManager {
     fn set_replay_config(&mut self, enabled: bool, max_bytes: usize) {
         self.replay_on_attach = enabled;
         self.replay_bytes = max_bytes;
+    }
+
+    fn dashboard_sample_request(&self) -> SampleRequest {
+        let roots = self
+            .sessions
+            .iter()
+            .filter_map(|(session_id, pty)| {
+                let pty = pty.lock().ok()?;
+                Some(SessionRoot {
+                    session_id: *session_id,
+                    root_pid: pty.child_pid(),
+                    foreground_pid: pty.foreground_process_group(),
+                    writer_active: self.attached_sessions.contains_key(session_id),
+                })
+            })
+            .collect::<Vec<_>>();
+        SampleRequest {
+            roots,
+            session_count: saturating_u32(self.session_info.len()),
+            runtime_count: saturating_u32(self.sessions.len()),
+            active_writer_count: saturating_u32(self.attached_sessions.len()),
+            readonly_client_count: saturating_u32(self.ro_attached.values().map(Vec::len).sum()),
+        }
     }
 
     fn replay_output(&self, id: u32) -> Vec<u8> {
@@ -4227,6 +4263,33 @@ mod tests {
             idle.ends_with('s') || idle.is_empty(),
             "idle should be in seconds or empty, got: {idle}"
         );
+    }
+
+    #[test]
+    fn dashboard_request_copies_roots_and_connection_counts() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut manager = SessionManager::new(
+            0,
+            false,
+            temp.path().join("logs"),
+            temp.path().join("history"),
+            0,
+            0,
+        );
+        let id = manager.create().expect("create session");
+        manager.mark_attached(id, 10);
+        manager.add_ro_client(id, 11);
+        manager.add_ro_client(id, 12);
+
+        let request = manager.dashboard_sample_request();
+        assert_eq!(request.session_count, 1);
+        assert_eq!(request.runtime_count, 1);
+        assert_eq!(request.active_writer_count, 1);
+        assert_eq!(request.readonly_client_count, 2);
+        assert_eq!(request.roots.len(), 1);
+        assert_eq!(request.roots[0].session_id, id);
+        assert!(request.roots[0].root_pid > 0);
+        assert!(request.roots[0].writer_active);
     }
 
     #[test]

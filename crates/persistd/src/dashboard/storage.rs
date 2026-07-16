@@ -143,6 +143,13 @@ impl MetricStorage {
         Ok(report)
     }
 
+    pub(super) fn flush(&mut self) -> io::Result<()> {
+        if let Some(current) = self.current.as_mut() {
+            current.file.flush()?;
+        }
+        Ok(())
+    }
+
     fn create_segment(&self, hour_start_ms: u64) -> io::Result<CurrentSegment> {
         if fs::read_dir(&self.dir)?.count() >= self.limits.max_directory_entries {
             return Err(invalid_data("metrics directory entry limit reached"));

@@ -342,7 +342,7 @@
 - [x] SSH_AUTH_SOCK sync（M40）
 - [x] Snapshot（M41）
 - [x] Metrics（M42）
-- [-] Performance dashboard（M52：小时分段存储已完成，当前实现 worker 与 daemon 生命周期）
+- [-] Performance dashboard（M52：worker 生命周期已完成，当前实现 daemon Dashboard IPC）
 
 ---
 
