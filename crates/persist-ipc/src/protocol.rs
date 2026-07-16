@@ -57,6 +57,10 @@ pub enum MessageType {
     SessionSnapshotResp = 0x0035,
     Metrics = 0x0036,
     MetricsResp = 0x0037,
+    DashboardSummary = 0x0038,
+    DashboardSummaryResp = 0x0039,
+    DashboardTrend = 0x003A,
+    DashboardTrendResp = 0x003B,
     Close = 0x0302,
     CloseResp = 0x0304,
     Kill = 0x0303,
@@ -115,6 +119,10 @@ impl MessageType {
             0x0035 => Some(Self::SessionSnapshotResp),
             0x0036 => Some(Self::Metrics),
             0x0037 => Some(Self::MetricsResp),
+            0x0038 => Some(Self::DashboardSummary),
+            0x0039 => Some(Self::DashboardSummaryResp),
+            0x003A => Some(Self::DashboardTrend),
+            0x003B => Some(Self::DashboardTrendResp),
             0x0100 => Some(Self::Stdin),
             0x0101 => Some(Self::Stdout),
             0x0102 => Some(Self::Resize),
@@ -1243,11 +1251,27 @@ mod tests {
     }
 
     #[test]
-    fn metrics_message_types_round_trip() {
+    fn observability_message_types_round_trip() {
         assert_eq!(MessageType::from_u16(0x0036), Some(MessageType::Metrics));
         assert_eq!(
             MessageType::from_u16(0x0037),
             Some(MessageType::MetricsResp)
+        );
+        assert_eq!(
+            MessageType::from_u16(0x0038),
+            Some(MessageType::DashboardSummary)
+        );
+        assert_eq!(
+            MessageType::from_u16(0x0039),
+            Some(MessageType::DashboardSummaryResp)
+        );
+        assert_eq!(
+            MessageType::from_u16(0x003A),
+            Some(MessageType::DashboardTrend)
+        );
+        assert_eq!(
+            MessageType::from_u16(0x003B),
+            Some(MessageType::DashboardTrendResp)
         );
     }
 

@@ -1,8 +1,16 @@
 //! Unix socket protocol boundary for PersistShell.
 
+pub mod dashboard;
 pub mod protocol;
 pub mod socket;
 
+pub use dashboard::{
+    decode_summary_request, decode_summary_response, decode_trend_request, decode_trend_response,
+    encode_summary_request, encode_summary_response, encode_trend_request, encode_trend_response,
+    CollectionStatus, Completeness, DaemonMetrics, DashboardSummaryRequest,
+    DashboardSummaryResponse, DashboardTrendRequest, DashboardTrendResponse, SessionMetrics,
+    TrendPoint, TrendRange, TrendScope, MAX_SUMMARY_PAGE, MAX_TREND_POINTS,
+};
 pub use protocol::{
     decode_attach, decode_attach_resp, decode_detach, decode_hello, decode_hello_ack,
     decode_list_sessions_resp, decode_lock, decode_new_session_resp, decode_note,

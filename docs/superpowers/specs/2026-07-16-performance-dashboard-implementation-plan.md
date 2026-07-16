@@ -1,5 +1,17 @@
 # M52 Performance dashboard 实施计划
 
+## 进度
+
+- [x] 阶段 1：Dashboard IPC
+- [ ] 阶段 2：有界内存模型
+- [ ] 阶段 3：单次 `/proc` 进程树聚合
+- [ ] 阶段 4：版本化小时分段
+- [ ] 阶段 5：Worker 与 Daemon 生命周期
+- [ ] 阶段 6：Daemon Dashboard IPC
+- [ ] 阶段 7：CLI 数据客户端与命令入口
+- [ ] 阶段 8：Ratatui 全屏界面
+- [ ] 阶段 9：性能、文档与发布验证
+
 ## 目标与边界
 
 按照已确认的设计和 `ADR-0004` 实现 `persist top`，提供 daemon 汇总和活跃 Session 进程树的

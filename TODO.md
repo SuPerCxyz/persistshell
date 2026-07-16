@@ -342,7 +342,7 @@
 - [x] SSH_AUTH_SOCK sync（M40）
 - [x] Snapshot（M41）
 - [x] Metrics（M42）
-- [-] Performance dashboard（M52：设计已确认，当前实现 Dashboard IPC）
+- [-] Performance dashboard（M52：Dashboard IPC 已完成，当前实现有界内存模型）
 
 ---
 
