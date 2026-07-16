@@ -9,7 +9,7 @@
 - [x] 阶段 5：Worker 与 Daemon 生命周期
 - [x] 阶段 6：Daemon Dashboard IPC
 - [x] 阶段 7：CLI 数据客户端与命令入口
-- [ ] 阶段 8：Ratatui 全屏界面
+- [x] 阶段 8：Ratatui 全屏界面
 - [ ] 阶段 9：性能、文档与发布验证
 
 ## 目标与边界
@@ -171,9 +171,10 @@
 新增或修改：
 
 - `crates/persist-cli/src/dashboard/app.rs`
+- `crates/persist-cli/src/dashboard/runtime.rs`
 - `crates/persist-cli/src/dashboard/ui.rs`
 - `crates/persist-cli/src/dashboard/terminal.rs`
-- `crates/persist-cli/src/dashboard/ui_tests.rs`
+- `crates/persist-cli/src/dashboard/app_tests.rs`
 
 步骤：
 

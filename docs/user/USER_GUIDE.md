@@ -337,8 +337,9 @@ persist metrics
 persist top
 ```
 
-`persist top` 要求 stdin/stdout 均为 TTY。当前阶段已接入有界分页和趋势数据客户端；全屏图表
-和键盘交互将在后续阶段完成。`snapshot` 与 `metrics` 仍是一次性命令。
+`persist top` 要求 stdin/stdout 均为 TTY。使用 `j/k` 或方向键选择 Session，`Enter` 查看详情，
+`s` 切换排序，`r` 切换 15 分钟/1 小时/24 小时趋势，`Esc` 返回，`q` 或 `Ctrl+C` 退出。
+指标每 5 秒刷新，窄小终端自动降级；`snapshot` 与 `metrics` 仍是一次性命令。
 
 ## 13. Daemon 管理
 

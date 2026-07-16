@@ -180,9 +180,12 @@ runtime 数量、active writer 数量和只读客户端数量。它不启动 met
 persist top
 ```
 
-该命令仅允许在 stdin/stdout 都是 TTY 时运行，并通过有界 Dashboard IPC 读取全部 summary
-分页。当前阶段完成命令入口、协议校验和数据客户端；全屏布局、图表和键盘交互将在后续阶段
-接入。脚本继续使用 `persist metrics`。
+该命令仅允许在 stdin/stdout 都是 TTY 时运行。主视图显示 daemon 状态和 Session 表格，默认
+按 CPU 降序；`j/k` 或方向键移动，`s` 切换 CPU/RSS/I/O/进程数/ID 排序，`Enter` 打开详情，
+`r` 切换 15 分钟/1 小时/24 小时趋势，`Esc` 返回，`q` 或 `Ctrl+C` 退出。
+
+指标每 5 秒刷新；断线时保留最后数据并显示状态，随后有界重连。窄小终端会隐藏次要列或退化
+为数值摘要。正常、错误和按键退出都会恢复终端模式。脚本继续使用 `persist metrics`。
 
 ---
 

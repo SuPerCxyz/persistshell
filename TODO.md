@@ -342,7 +342,7 @@
 - [x] SSH_AUTH_SOCK sync（M40）
 - [x] Snapshot（M41）
 - [x] Metrics（M42）
-- [-] Performance dashboard（M52：CLI 数据客户端已完成，当前实现 Ratatui 全屏界面）
+- [-] Performance dashboard（M52：Ratatui 全屏界面已完成，当前执行性能、文档与发布验证）
 
 ---
 

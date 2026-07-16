@@ -1,19 +1,28 @@
 use std::collections::HashSet;
-use std::io::Write;
 use std::time::Duration;
 
 use persist_core::{Config, PersistError, Result};
 use persist_ipc::{
     decode_summary_response, decode_trend_response, encode_summary_request, encode_trend_request,
     write_frame, Completeness, DaemonMetrics, DashboardSummaryRequest, DashboardSummaryResponse,
-    DashboardTrendRequest, DashboardTrendResponse, Frame, MessageType, SessionMetrics, TrendRange,
-    TrendScope, MAX_SUMMARY_PAGE, MAX_TREND_POINTS,
+    DashboardTrendRequest, DashboardTrendResponse, Frame, MessageType, SessionMetrics,
+    MAX_SUMMARY_PAGE,
 };
 
 const MAX_SUMMARY_SESSIONS: usize = 262_144;
 const REFRESH_INTERVAL: Duration = Duration::from_secs(5);
 const MIN_RECONNECT_DELAY: Duration = Duration::from_millis(250);
 const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(5);
+
+mod app;
+mod runtime;
+mod terminal;
+mod ui;
+
+#[cfg(test)]
+mod app_tests;
+
+pub(crate) use runtime::run;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DashboardSnapshot {
@@ -134,33 +143,6 @@ impl DashboardClient {
         self.next_request_id = self.next_request_id.wrapping_add(1).max(1);
         current
     }
-}
-
-pub(crate) fn run<W: Write>(config: &Config, output: &mut W, interactive: bool) -> Result<()> {
-    if !interactive {
-        return Err(PersistError::invalid_argument(
-            "persist top requires an interactive terminal",
-        ));
-    }
-    let mut client = DashboardClient::connect(config)?;
-    let snapshot = client.summary()?;
-    let trend = client.trend(DashboardTrendRequest {
-        scope: TrendScope::Daemon,
-        range: TrendRange::FifteenMinutes,
-        max_points: MAX_TREND_POINTS,
-    })?;
-    writeln!(
-        output,
-        "sampled_at={} sessions={} trend_points={} status={:?}",
-        snapshot.sampled_at_ms,
-        snapshot.sessions.len(),
-        trend.points.len(),
-        snapshot.completeness
-    )
-    .map_err(|source| PersistError::Io {
-        operation: "write dashboard status",
-        source,
-    })
 }
 
 pub(crate) fn collect_summary_pages(
