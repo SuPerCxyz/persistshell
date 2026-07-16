@@ -357,6 +357,7 @@
 - [x] Security review（M44：socket、日志、metadata 权限与输入边界审查）
 - [x] Compatibility matrix（M45：Ubuntu bash/zsh/fish、Rocky bash 基线）
 - [x] Performance regression（M43：本地和 test 主机 100/500/1000 Session 基准）
-- [x] v1.0 release checklist（M50：已确认发布 0.1.0；tag、push、GitHub workflow 与公开发布待维护者授权）
+- [x] v1.0 release checklist（M50：0.1.0 tag、平台 workflow、artifact 复核与 test 部署已完成）
+- [ ] 决定 GitHub Release、artifact 附件、签名与 SBOM 策略
 - [x] User documentation complete（M49：命令、配置、安装、FAQ 一致性审计）
 - [x] Troubleshooting guide complete（M49：daemon、socket、权限、恢复、日志和绕过）

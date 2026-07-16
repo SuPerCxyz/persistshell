@@ -78,5 +78,5 @@
 ## 当前约束
 
 Rust runtime、PTY、daemon、IPC streaming、SSH 接管、安装器和平台发布包均已完成阶段性验证。
-M50 已完成本地、Rocky 容器和 test 主机检查；新的 Ubuntu 26.04/RHEL 9 GitHub jobs 尚待
-推送触发，GitHub Release 与签名仍须维护者授权。
+M50 已完成本地、Rocky 容器、GitHub hosted jobs、artifact 下载和 test 主机检查；GitHub
+Release、签名与 SBOM 仍须维护者决策。

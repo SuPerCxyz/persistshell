@@ -4,8 +4,8 @@
 
 M50 的本地与 test 主机发布就绪检查已经完成。维护者已确认发布版本为 `0.1.0`，对应 tag 为
 `v0.1.0`。当前可构建并校验该版本的 tarball、deb 和 rpm；实现已推送并同步到 GitHub mirror，
-`v0.1.0` 已发布，分支和 tag CI、tag Package workflow 均已通过。GitHub artifact 已生成，但当前
-匿名环境不能下载归档，尚未对 GitHub 下载副本执行独立 checksum。
+`v0.1.0` 已发布，分支和 tag CI、tag Package workflow 均已通过。tag 后的平台修复也已通过
+Package run `29464594020`，两个平台 artifact 已下载并完成独立复核。
 
 ## 本机证据
 
@@ -51,10 +51,10 @@ Unicode-3.0 或 Unlicense 等宽松许可路径；其中 `r-efi` 的 LGPL-2.1-or
 
 ## 发布阻塞项
 
-以下不是代码质量失败，而是未授权或依赖外部平台的发布动作：
+以下不是代码质量失败，而是仍需维护者决策的发布动作：
 
-1. 使用具备 GitHub Actions artifact 读取权限的身份下载并复核 artifact。
-2. 决定 GitHub Release、artifact 附件和签名策略。
+1. 决定是否创建 GitHub Release 及附加哪些 artifact。
+2. 决定签名、SBOM 和 `NOTICE` 策略。
 
 详细操作顺序见 `docs/release/RELEASE_CHECKLIST.md`。本审计不把这些未执行动作标记为完成。
 
@@ -63,5 +63,5 @@ Unicode-3.0 或 Unlicense 等宽松许可路径；其中 `r-efi` 的 LGPL-2.1-or
 后续 Rocky Linux 9.7 安装测试证明，历史 `v0.1.0` GitHub workflow 在 Ubuntu 上构建的通用
 tarball 依赖 `GLIBC_2.39`，不能作为 RHEL 9 二进制。`master` 已改为 Ubuntu 26.04 与
 Rocky Linux 9 独立构建，并修复远程全功能测试发现的 runtime 缺陷。历史 tag 和 artifact
-保持不变；新 workflow 尚待推送触发。完整证据见
+保持不变；新 workflow、artifact 复核和 test 安装验证均已通过。完整证据见
 `docs/audit/2026-07-15-m50-platform-package-remote-validation.md`。

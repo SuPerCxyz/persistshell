@@ -22,7 +22,7 @@ M50：v1.0 Release Readiness
 
 ## 当前唯一任务
 
-提交并推送平台打包与远程验证修复，触发 GitHub workflow 实测。
+由维护者确定 GitHub Release、artifact 附件、签名与 SBOM 策略。
 
 ### 前置已完成
 
@@ -31,24 +31,27 @@ M50：v1.0 Release Readiness
 - 维护者已确认发布版本为 `0.1.0`，对应 tag 为 `v0.1.0`。
 - 发布实现已推送并同步到 GitHub，分支 CI run `29413709266` 通过。
 - `v0.1.0` 已同步到 GitHub，tag CI run `29414016648` 和 Package run `29414016642` 通过。
+- tag 后平台修复已同步到提交 `3cbe15d`；Package run `29464594020` 的 Ubuntu 26.04 与
+  RHEL 9 job 均通过。
+- 两个平台 artifact 已下载并独立复核，RHEL 9 RPM 已部署到 test 完成核心回归。
 
 ---
 
 ## 任务范围
 
-- 提交当前已通过本地与 test 验证的代码和文档。
-- 经维护者确认后推送到自建 Git，并等待同步到 GitHub mirror。
-- 手动触发 Package workflow，复核两个平台 job 与 artifact。
-- 暂不创建 GitHub Release，不改写 `v0.1.0` tag。
+- 决定是否为现有 `v0.1.0` 创建 GitHub Release，或等待后续修复版本。
+- 若创建 Release，明确附加历史 tag 产物还是 tag 后平台产物；不得把历史 Ubuntu RPM 标记为 RHEL 9 兼容。
+- 决定是否对 artifact 签名、生成 SBOM 或补充 `NOTICE`。
+- 不移动或改写现有 `v0.1.0` tag。
 
 ---
 
 ## 完成标准
 
-1. 自建 Git 与 GitHub mirror 指向同一已验证提交。
-2. Ubuntu 26.04 和 RHEL 9 Package job 均通过。
-3. 两个平台 artifact 可下载并独立校验 checksum、内容与运行时 ABI。
-4. 审计记录补充 GitHub run ID 和 artifact digest。
+1. 发布或暂缓策略得到维护者明确确认。
+2. artifact 来源、兼容性标签和附件集合没有歧义。
+3. 签名、SBOM 与 `NOTICE` 的执行或暂缓状态写入发布清单。
+4. 若创建 Release，发布结果和最终 digest 写入审计；若暂缓，记录下一次评估条件。
 
 ---
 
