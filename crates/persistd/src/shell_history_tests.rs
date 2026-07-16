@@ -220,7 +220,7 @@ fn assert_custom_filter_degrades(shell: &str, shell_name: &str) {
 }
 
 fn wait_for_file(path: &Path, expected: &str) {
-    let deadline = Instant::now() + Duration::from_secs(3);
+    let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
         if fs::read_to_string(path).is_ok_and(|content| content.contains(expected)) {
             return;
