@@ -4,7 +4,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use persist_pty::PtyEngine;
+use persist_pty::{PtyEngine, PtySession};
 
 use crate::shell_history::prepare;
 
@@ -145,7 +145,7 @@ fn assert_shell_behavior(shell: &str, shell_name: &str, root: &Path, home: &Path
             &launch.arguments,
         )
         .unwrap();
-    wait_for_file(&ready_marker, "r", Duration::from_secs(30));
+    wait_for_file_with_pty(&mut session, &ready_marker, "r", Duration::from_secs(30));
     writeln!(session, "echo $USER_CONFIG_MARKER").unwrap();
     if shell_name == "bash" {
         writeln!(session, " echo secret").unwrap();
@@ -243,6 +243,36 @@ fn wait_for_file(path: &Path, expected: &str, timeout: Duration) {
         std::thread::sleep(Duration::from_millis(20));
     }
     panic!("history helper did not capture {expected}");
+}
+
+fn wait_for_file_with_pty(
+    session: &mut PtySession,
+    path: &Path,
+    expected: &str,
+    timeout: Duration,
+) {
+    const MAX_DIAGNOSTIC_BYTES: usize = 64 * 1024;
+    let deadline = Instant::now() + timeout;
+    let mut buffer = [0_u8; 4096];
+    let mut output = Vec::new();
+    while Instant::now() < deadline {
+        while session.poll_output(Duration::ZERO).unwrap_or(false) {
+            let read = session.read_output(&mut buffer).unwrap_or(0);
+            if read == 0 {
+                break;
+            }
+            let remaining = MAX_DIAGNOSTIC_BYTES.saturating_sub(output.len());
+            output.extend_from_slice(&buffer[..read.min(remaining)]);
+        }
+        if fs::read_to_string(path).is_ok_and(|content| content.contains(expected)) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    panic!(
+        "shell did not become ready; output={:?}",
+        String::from_utf8_lossy(&output)
+    );
 }
 
 fn temp_root(name: &str) -> PathBuf {
