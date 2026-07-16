@@ -54,7 +54,7 @@ fn bash_preserves_user_config_hook_and_history_filter() {
     fs::create_dir_all(&home).unwrap();
     fs::write(
         home.join(".bashrc"),
-        "export USER_CONFIG_MARKER=bash-loaded\nHISTCONTROL=ignorespace\nPROMPT_COMMAND='printf x >>\"$PERSIST_PROMPT_MARKER\"'\n",
+        "export USER_CONFIG_MARKER=bash-loaded\nprintf r >\"$PERSIST_READY_MARKER\"\nHISTCONTROL=ignorespace\nPROMPT_COMMAND='printf x >>\"$PERSIST_PROMPT_MARKER\"'\n",
     )
     .unwrap();
     assert_shell_behavior("/bin/bash", "bash", &root, &home);
@@ -67,7 +67,7 @@ fn zsh_preserves_user_config_hook_and_history_filter() {
     fs::create_dir_all(&home).unwrap();
     fs::write(
         home.join(".zshrc"),
-        "export USER_CONFIG_MARKER=zsh-loaded\nuser_precmd() { print -rn x >>\"$PERSIST_PROMPT_MARKER\"; }\nprecmd_functions+=(user_precmd)\n",
+        "export USER_CONFIG_MARKER=zsh-loaded\nprintf r >\"$PERSIST_READY_MARKER\"\nuser_precmd() { print -rn x >>\"$PERSIST_PROMPT_MARKER\"; }\nprecmd_functions+=(user_precmd)\n",
     )
     .unwrap();
     assert_shell_behavior("/usr/bin/zsh", "zsh", &root, &home);
@@ -82,7 +82,7 @@ fn fish_preserves_user_config_hook_and_history_filter() {
     fs::create_dir_all(&home).unwrap();
     fs::write(
         fish_config.join("config.fish"),
-        "set -gx USER_CONFIG_MARKER fish-loaded\nfunction user_postexec --on-event fish_postexec\n    printf x >>\"$PERSIST_PROMPT_MARKER\"\nend\n",
+        "set -gx USER_CONFIG_MARKER fish-loaded\nprintf r >\"$PERSIST_READY_MARKER\"\nfunction user_postexec --on-event fish_postexec\n    printf x >>\"$PERSIST_PROMPT_MARKER\"\nend\n",
     )
     .unwrap();
     assert_shell_behavior("/usr/bin/fish", "fish", &root, &home);
@@ -105,6 +105,7 @@ fn assert_shell_behavior(shell: &str, shell_name: &str, root: &Path, home: &Path
     let helper = create_helper(root);
     let capture = root.join("captured");
     let prompt_marker = root.join("prompt-marker");
+    let ready_marker = root.join("ready-marker");
     let launch = prepare(shell, 17, root, &helper).unwrap().unwrap();
     let mut environment = launch.environment;
     environment.extend([
@@ -116,6 +117,10 @@ fn assert_shell_behavior(shell: &str, shell_name: &str, root: &Path, home: &Path
         (
             "PERSIST_PROMPT_MARKER".into(),
             prompt_marker.to_string_lossy().into_owned(),
+        ),
+        (
+            "PERSIST_READY_MARKER".into(),
+            ready_marker.to_string_lossy().into_owned(),
         ),
         (
             "XDG_CONFIG_HOME".into(),
@@ -136,7 +141,7 @@ fn assert_shell_behavior(shell: &str, shell_name: &str, root: &Path, home: &Path
             &launch.arguments,
         )
         .unwrap();
-    std::thread::sleep(Duration::from_millis(250));
+    wait_for_file(&ready_marker, "r");
     writeln!(session, "echo $USER_CONFIG_MARKER").unwrap();
     if shell_name == "bash" {
         writeln!(session, " echo secret").unwrap();

@@ -419,6 +419,8 @@
   GitHub Actions 在无 `SHELL` 环境下误报失败。
 - 修复 CLI 集成测试依赖 runner `XDG_RUNTIME_DIR` 或 `UID` 的问题，所有子进程改用测试专属
   XDG 目录，避免 runner 环境差异和宿主 daemon 干扰。
+- 修复 zsh history 集成测试用固定延时猜测 Shell 就绪状态的竞态，改为等待测试用户配置写入
+  ready 标记后再发送首条命令。
 - 完成 M44 安全审查：收紧 metadata、session log 和 stale socket 清理边界，并补齐权限测试。
 - `persist daemon start` 现在显式以 `0600` 创建并重设 runtime daemon log 权限，不再依赖 umask。
 - 修复 ClientSocket 将 5 秒握手超时保留到后续操作的问题；高负载 `persist new` 不再因该超时误报 `EAGAIN`。
