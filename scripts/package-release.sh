@@ -3,9 +3,18 @@ set -euo pipefail
 
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
 TARGET=${PERSIST_PACKAGE_TARGET:-x86_64-unknown-linux-gnu}
+PLATFORM=${PERSIST_PACKAGE_PLATFORM:-}
+RPM_RELEASE=${PERSIST_PACKAGE_RPM_RELEASE:-1}
 DIST=${PERSIST_PACKAGE_DIST:-dist}
-NAME="persistshell-v${VERSION}-${TARGET}"
+if [[ -n "$PLATFORM" ]]; then
+    NAME="persistshell-v${VERSION}-${PLATFORM}-${TARGET}"
+else
+    NAME="persistshell-v${VERSION}-${TARGET}"
+fi
 REPO_ROOT=$(pwd -P)
+
+mkdir -p "$DIST"
+DIST=$(cd "$DIST" && pwd -P)
 
 [[ -n "$VERSION" ]] || { printf 'package: workspace version not found\n' >&2; exit 2; }
 [[ -x target/release/persist && -x target/release/persistd ]] || {
@@ -59,7 +68,7 @@ package_rpm() {
     cat >"$spec" <<EOF
 Name: persistshell
 Version: $VERSION
-Release: 1
+Release: $RPM_RELEASE
 Summary: Persistent interactive shell runtime
 License: MIT
 BuildArch: x86_64
@@ -86,14 +95,13 @@ install -m 0644 "$REPO_ROOT"/docs/man/*.1 %{buildroot}/usr/share/man/man1/
 /usr/share/doc/persistshell
 /usr/share/man/man1
 EOF
-    rpmbuild --define "_topdir $(pwd)/$topdir" -bb "$spec"
+    rpmbuild --define "_topdir $topdir" -bb "$spec"
     rpm_path=$(find "$topdir/RPMS" -name 'persistshell-*.rpm' -print -quit)
     [[ -n "$rpm_path" ]] || { printf 'package: rpm artifact not found\n' >&2; return 1; }
     cp "$rpm_path" "$DIST/"
     (cd "$DIST" && sha256sum "$(basename "$rpm_path")" >"$(basename "$rpm_path").sha256")
 }
 
-mkdir -p "$DIST"
 for format in "$@"; do
     case "$format" in
         tarball) package_tarball ;;

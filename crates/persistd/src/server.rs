@@ -28,12 +28,13 @@ use persist_ipc::{
     encode_attach, encode_attach_resp, encode_detach, encode_hello, encode_hello_ack,
     encode_list_sessions_resp, encode_new_session_resp, encode_note, encode_note_get_resp,
     encode_op_resp, encode_pin, encode_process_stats_resp, encode_process_tree_resp, encode_resize,
-    encode_signal, encode_tag, encode_tag_list_resp, encode_writer_control, read_frame,
-    write_frame, AttachPayload, AttachRespPayload, DaemonConnection, DaemonSocket, DetachPayload,
-    Frame, FrameAccumulator, HelloAckPayload, HelloPayload, HelloStatus, ListSessionsRespPayload,
-    MessageType, NewSessionRespPayload, NotePayload, OpRespPayload, PinPayload,
-    ProcessStatsRespPayload, ProcessTreeNode, ProcessTreeRespPayload, ResizePayload, SessionEntry,
-    SignalPayload, TagListRespPayload, TagPayload, WriterControlPayload,
+    encode_session_exited, encode_signal, encode_tag, encode_tag_list_resp, encode_writer_control,
+    read_frame, write_frame, AttachPayload, AttachRespPayload, DaemonConnection, DaemonSocket,
+    DetachPayload, Frame, FrameAccumulator, HelloAckPayload, HelloPayload, HelloStatus,
+    ListSessionsRespPayload, MessageType, NewSessionRespPayload, NotePayload, OpRespPayload,
+    PinPayload, ProcessStatsRespPayload, ProcessTreeNode, ProcessTreeRespPayload, ResizePayload,
+    SessionEntry, SessionExitedPayload, SignalPayload, TagListRespPayload, TagPayload,
+    WriterControlPayload, MAX_IO_FRAME,
 };
 use persist_metadata::MetadataStore;
 use persist_pty::pty::detect_shell;
@@ -146,6 +147,10 @@ fn run_foreground(idle_timeout: Option<std::time::Duration>) -> Result<()> {
         config.logging.max_file_size.bytes(),
         config.logging.max_files,
     );
+    manager.set_replay_config(
+        config.ring_buffer.replay_on_attach,
+        config.ring_buffer.replay_bytes.bytes() as usize,
+    );
     manager.set_next_id(next_session_id);
     let sm = Arc::new(Mutex::new(manager));
     let gc_timeout = idle_timeout.unwrap_or(config.daemon.gc_idle_timeout.duration());
@@ -177,7 +182,23 @@ fn run_foreground(idle_timeout: Option<std::time::Duration>) -> Result<()> {
                     .is_some_and(|record| record.pinned)
             });
             if !removed.is_empty() {
-                eprintln!("persistd: GC removed sessions: {removed:?}");
+                let removed_ids = removed
+                    .into_iter()
+                    .filter_map(|(id, closed)| {
+                        metadata
+                            .lock()
+                            .unwrap()
+                            .close_session_with_context(
+                                id,
+                                closed.exit_code,
+                                closed.recovery_context.cwd.as_deref(),
+                                closed.recovery_context.env_snapshot.as_deref(),
+                            )
+                            .ok()
+                            .map(|_| id)
+                    })
+                    .collect::<Vec<_>>();
+                eprintln!("persistd: GC removed sessions: {removed_ids:?}");
             }
             next_gc = std::time::Instant::now() + gc_interval;
         }
@@ -193,6 +214,8 @@ struct SessionManager {
     session_info: HashMap<u32, SessionInfo>,
     ring_buffers: HashMap<u32, Arc<Mutex<RingBuffer>>>,
     ring_buffer_size: usize,
+    replay_on_attach: bool,
+    replay_bytes: usize,
     log_handles: HashMap<u32, SessionLogHandle>,
     session_log_enabled: bool,
     logs_dir: PathBuf,
@@ -459,6 +482,8 @@ impl SessionManager {
             session_info: HashMap::new(),
             ring_buffers: HashMap::new(),
             ring_buffer_size,
+            replay_on_attach: true,
+            replay_bytes: ring_buffer_size,
             log_handles: HashMap::new(),
             session_log_enabled,
             logs_dir,
@@ -482,6 +507,21 @@ impl SessionManager {
 
     fn set_next_id(&mut self, next_id: u32) {
         self.next_id = next_id;
+    }
+
+    fn set_replay_config(&mut self, enabled: bool, max_bytes: usize) {
+        self.replay_on_attach = enabled;
+        self.replay_bytes = max_bytes;
+    }
+
+    fn replay_output(&self, id: u32) -> Vec<u8> {
+        if !self.replay_on_attach || self.replay_bytes == 0 {
+            return Vec::new();
+        }
+        self.ring_buffers
+            .get(&id)
+            .map(|buffer| buffer.lock().unwrap().read_replay(self.replay_bytes))
+            .unwrap_or_default()
     }
 
     fn create_with_shell(&mut self, shell: Option<&str>) -> Result<u32> {
@@ -661,7 +701,7 @@ impl SessionManager {
         self.gc_idle_timeout = timeout;
     }
 
-    fn gc_run(&mut self, is_pinned: impl Fn(u32) -> bool) -> Vec<u32> {
+    fn gc_run(&mut self, is_pinned: impl Fn(u32) -> bool) -> Vec<(u32, ClosedSession)> {
         if self.gc_idle_timeout.is_zero() {
             return Vec::new();
         }
@@ -683,11 +723,15 @@ impl SessionManager {
                 to_remove.push(*id);
             }
         }
-        for id in &to_remove {
-            let _ = self.kill_session(*id);
-            self.remove(*id);
+        let mut removed = Vec::new();
+        for id in to_remove {
+            if self.kill_session(id).is_ok() {
+                if let Ok(Some(closed)) = self.close_session(id) {
+                    removed.push((id, closed));
+                }
+            }
         }
-        to_remove
+        removed
     }
 
     fn set_locked(&mut self, id: u32, locked: bool) {
@@ -716,9 +760,7 @@ impl SessionManager {
         if let Some(fds) = self.ro_attached.get(&id) {
             let mut dead = Vec::new();
             for fd in fds {
-                let ret =
-                    unsafe { libc::write(*fd, data.as_ptr() as *const libc::c_void, data.len()) };
-                if ret < 0 {
+                if write_stdout_raw(*fd, data).is_err() {
                     dead.push(*fd);
                 }
             }
@@ -734,6 +776,10 @@ impl SessionManager {
                 }
             }
         }
+    }
+
+    fn readonly_clients(&self, id: u32) -> Vec<RawFd> {
+        self.ro_attached.get(&id).cloned().unwrap_or_default()
     }
 
     fn kill_session(&mut self, id: u32) -> Result<()> {
@@ -1226,6 +1272,10 @@ fn handle_client(
                             let granted =
                                 encode_writer_control(&WriterControlPayload { session_id: sid });
                             let _ = write_frame_raw(fd, MessageType::WriteGranted, &granted);
+                            let replay = sm.lock().unwrap().replay_output(sid);
+                            if !replay.is_empty() {
+                                let _ = write_stdout_raw(fd, &replay);
+                            }
                             let _ = io_loop(fd, sid, &sm_clone, &ms);
                         }
                     }
@@ -1268,6 +1318,10 @@ fn handle_client(
                             },
                         );
                         if ok {
+                            let replay = sm.lock().unwrap().replay_output(sid);
+                            if !replay.is_empty() {
+                                let _ = write_stdout_raw(fd, &replay);
+                            }
                             let _ = ro_recv_loop(fd, sid, &sm);
                         }
                     }
@@ -1287,13 +1341,6 @@ fn handle_client(
                             let _ = pty.write_input(&payload);
                         }
                         sm.record_activity(sid);
-                        if let Some(rb) = sm.ring_buffers.get(&sid) {
-                            let mut rb = rb.lock().unwrap();
-                            rb.write(&payload);
-                        }
-                        if let Some(handle) = sm.log_handles.get(&sid) {
-                            handle.write(&payload);
-                        }
                     }
                 }
                 MessageType::Resize => {
@@ -1838,10 +1885,6 @@ fn io_loop(
                                 }
                             }
                             sm.record_activity(sid);
-                            if let Some(rb) = sm.ring_buffers.get(&sid) {
-                                let mut rb = rb.lock().unwrap();
-                                rb.write(&frame.payload);
-                            }
                         }
                         MessageType::Resize => {
                             if let Some(payload) = decode_resize(&frame.payload) {
@@ -1897,7 +1940,7 @@ fn io_loop(
         }
 
         // Check PTY output
-        let (n, should_break) = {
+        let (n, exit_code) = {
             let mut sm_guard = sm.lock().unwrap();
             let pty_arc = sm_guard
                 .sessions
@@ -1913,15 +1956,15 @@ fn io_loop(
                         0
                     };
                     if n > 0 {
-                        let _ = write_frame_raw(fd, MessageType::Stdout, &pty_buf[..n]);
+                        let _ = write_stdout_raw(fd, &pty_buf[..n]);
                     }
                     let recovery_context = capture_recovery_context(&pty);
-                    let should_break = pty.poll_exit().ok().flatten().is_some();
+                    let exit_code = pty.poll_exit().ok().flatten();
                     drop(pty);
                     sm_guard.record_recovery_context(sid, recovery_context);
-                    (n, should_break)
+                    (n, exit_code)
                 }
-                None => (0, true),
+                None => (0, Some(0)),
             }
         };
         if n > 0 {
@@ -1932,9 +1975,13 @@ fn io_loop(
                 let mut rb = rb.lock().unwrap();
                 rb.write(&pty_buf[..n]);
             }
+            if let Some(handle) = sm_guard.log_handles.get(&sid) {
+                handle.write(&pty_buf[..n]);
+            }
         }
 
-        if should_break {
+        if exit_code.is_some() && n == 0 {
+            let readonly_clients = sm.lock().unwrap().readonly_clients(sid);
             let closed = { sm.lock().unwrap().close_session(sid) };
             if let Ok(Some(closed)) = closed {
                 if let Some(metadata) = ms {
@@ -1944,6 +1991,14 @@ fn io_loop(
                         closed.recovery_context.cwd.as_deref(),
                         closed.recovery_context.env_snapshot.as_deref(),
                     );
+                }
+                let payload = encode_session_exited(&SessionExitedPayload {
+                    session_id: sid,
+                    exit_code: closed.exit_code,
+                });
+                let _ = write_frame_raw(fd, MessageType::SessionExited, &payload);
+                for readonly_fd in readonly_clients {
+                    let _ = write_frame_raw(readonly_fd, MessageType::SessionExited, &payload);
                 }
             }
             break;
@@ -2079,11 +2134,153 @@ fn write_frame_raw(fd: RawFd, msg_type: MessageType, payload: &[u8]) -> io::Resu
     Ok(())
 }
 
+fn write_stdout_raw(fd: RawFd, data: &[u8]) -> io::Result<()> {
+    for chunk in data.chunks(MAX_IO_FRAME) {
+        write_frame_raw(fd, MessageType::Stdout, chunk)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Read;
     use std::os::unix::net::UnixStream;
+
+    fn read_until_session_exited(stream: &mut UnixStream) -> SessionExitedPayload {
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("set read timeout");
+        loop {
+            let frame = read_frame(stream).expect("read session frame");
+            if frame.msg_type == MessageType::SessionExited {
+                return persist_ipc::decode_session_exited(&frame.payload)
+                    .expect("decode session exited");
+            }
+        }
+    }
+
+    #[test]
+    fn readonly_stdout_is_framed() {
+        let (daemon, mut client) = UnixStream::pair().expect("socket pair");
+        let mut manager =
+            SessionManager::new(0, false, PathBuf::from("/tmp"), PathBuf::from("/tmp"), 0, 0);
+        manager.add_ro_client(7, daemon.as_raw_fd());
+
+        manager.broadcast_stdout(7, b"readonly output");
+
+        let frame = read_frame(&mut client).expect("read stdout frame");
+        assert_eq!(frame.msg_type, MessageType::Stdout);
+        assert_eq!(frame.payload, b"readonly output");
+    }
+
+    #[test]
+    fn stdout_larger_than_io_frame_is_split() {
+        let (daemon, mut client) = UnixStream::pair().expect("socket pair");
+        let output = vec![b'x'; MAX_IO_FRAME + 17];
+
+        write_stdout_raw(daemon.as_raw_fd(), &output).expect("write stdout frames");
+
+        let first = read_frame(&mut client).expect("read first frame");
+        let second = read_frame(&mut client).expect("read second frame");
+        assert_eq!(first.msg_type, MessageType::Stdout);
+        assert_eq!(first.payload.len(), MAX_IO_FRAME);
+        assert_eq!(second.msg_type, MessageType::Stdout);
+        assert_eq!(second.payload, vec![b'x'; 17]);
+    }
+
+    #[test]
+    fn replay_output_respects_limit_and_disable_flag() {
+        let mut manager = SessionManager::new(
+            16,
+            false,
+            PathBuf::from("/tmp"),
+            PathBuf::from("/tmp"),
+            0,
+            0,
+        );
+        let sid = manager
+            .create_with_shell(Some("/bin/sh"))
+            .expect("create shell");
+        manager
+            .ring_buffers
+            .get(&sid)
+            .expect("ring buffer")
+            .lock()
+            .unwrap()
+            .write(b"output-history");
+
+        manager.set_replay_config(true, 7);
+        assert_eq!(manager.replay_output(sid), b"history");
+        manager.set_replay_config(false, 7);
+        assert!(manager.replay_output(sid).is_empty());
+    }
+
+    #[test]
+    fn natural_exit_notifies_writer_and_readonly_client() {
+        let dir = tempfile::Builder::new()
+            .prefix("persistd-session-log-")
+            .tempdir()
+            .expect("create temp dir");
+        let logs_dir = dir.path().join("sessions");
+        let (daemon_writer, mut writer) = UnixStream::pair().expect("writer socket pair");
+        let (daemon_reader, mut reader) = UnixStream::pair().expect("reader socket pair");
+        set_nonblocking(daemon_writer.as_raw_fd()).expect("nonblocking writer");
+        let manager = Arc::new(Mutex::new(SessionManager::new(
+            0,
+            true,
+            logs_dir.clone(),
+            dir.path().join("history"),
+            1024 * 1024,
+            2,
+        )));
+        let sid = manager
+            .lock()
+            .unwrap()
+            .create_with_shell(Some("/bin/sh"))
+            .expect("create shell");
+        {
+            let mut manager = manager.lock().unwrap();
+            manager.mark_attached(sid, daemon_writer.as_raw_fd());
+            manager.add_ro_client(sid, daemon_reader.as_raw_fd());
+        }
+
+        let server_manager = manager.clone();
+        let server = std::thread::spawn(move || {
+            let _daemon_writer = daemon_writer;
+            io_loop(_daemon_writer.as_raw_fd(), sid, &server_manager, &None).expect("run io loop");
+        });
+        write_frame(
+            &mut writer,
+            &Frame {
+                msg_type: MessageType::Stdin,
+                flags: 0,
+                request_id: 0,
+                payload: b"printf 'SESSION_LOG_MARKER\\n'; exit 7\n".to_vec(),
+            },
+        )
+        .expect("send exit");
+
+        let writer_exit = read_until_session_exited(&mut writer);
+        let reader_exit = read_until_session_exited(&mut reader);
+        assert_eq!(writer_exit.session_id, sid);
+        assert_eq!(writer_exit.exit_code, 7);
+        assert_eq!(reader_exit.session_id, sid);
+        assert_eq!(reader_exit.exit_code, 7);
+
+        server.join().expect("join io loop");
+        assert!(manager.lock().unwrap().list().is_empty());
+        let log_path = logs_dir.join(format!("{sid}.log"));
+        for _ in 0..100 {
+            if std::fs::read_to_string(&log_path)
+                .is_ok_and(|content| content.contains("SESSION_LOG_MARKER"))
+            {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("PTY output was not written to {}", log_path.display());
+    }
 
     #[test]
     fn snapshot_json_keeps_small_json() {
@@ -4092,7 +4289,9 @@ mod tests {
         sm.set_gc_idle_timeout(Duration::from_millis(1));
         std::thread::sleep(Duration::from_millis(10));
         let removed = sm.gc_run(|_| false);
-        assert_eq!(removed, vec![id], "should remove idle session");
+        assert_eq!(removed.len(), 1, "should remove one idle session");
+        assert_eq!(removed[0].0, id, "should remove the idle session");
+        assert_eq!(removed[0].1.exit_code, 137);
         assert!(sm.list().is_empty(), "session should be removed");
     }
 

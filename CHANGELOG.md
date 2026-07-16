@@ -8,6 +8,20 @@
 
 ## Unreleased
 
+### Added
+
+- GitHub Package workflow 分离 Ubuntu 26.04 与 RHEL 9 ABI 构建，分别上传带平台标识的
+  tar/deb 与 tar/`.el9` RPM，并校验 checksum、包内容和 RHEL 9 GLIBC 2.34 上限。
+
+### Fixed
+
+- shell 自然退出后向 writer/read-only 客户端发送 `SessionExited`，并修复 read-only stdout
+  裸字节广播、attach ring replay 缺失和超大 replay frame 未分片问题。
+- PTY child 在 exec 前恢复 daemon 忽略的交互信号，Ctrl+C 可再次终止前台进程。
+- Session stdout 重新接入异步日志；Idle GC 现在同步关闭 metadata，不再留下 running 幽灵记录。
+- CLI help 补齐 lock/unlock/log export，并统一命令展示。
+- 打包脚本规范化自定义输出目录，修复 `PERSIST_PACKAGE_DIST` 为绝对路径时 RPM 产物定位失败。
+
 ## [0.1.0] - 2026-07-15
 
 ### Added

@@ -155,6 +155,9 @@ fn child_setup(
     agent_socket: Option<CString>,
 ) {
     unsafe {
+        if !reset_child_signals() {
+            libc::_exit(126);
+        }
         libc::setsid();
 
         let slave_fd = libc::open(slave_cstr.as_ptr(), libc::O_RDWR);
@@ -195,6 +198,30 @@ fn child_setup(
 
         let args = [shell_cstr.as_ptr(), std::ptr::null()];
         libc::execvp(shell_cstr.as_ptr(), args.as_ptr());
+    }
+}
+
+const CHILD_SIGNALS: [libc::c_int; 8] = [
+    libc::SIGHUP,
+    libc::SIGINT,
+    libc::SIGQUIT,
+    libc::SIGPIPE,
+    libc::SIGTERM,
+    libc::SIGTSTP,
+    libc::SIGTTIN,
+    libc::SIGTTOU,
+];
+
+fn reset_child_signals() -> bool {
+    unsafe {
+        for signal in CHILD_SIGNALS {
+            if libc::signal(signal, libc::SIG_DFL) == libc::SIG_ERR {
+                return false;
+            }
+        }
+        let mut mask: libc::sigset_t = std::mem::zeroed();
+        libc::sigemptyset(&mut mask);
+        libc::sigprocmask(libc::SIG_SETMASK, &mask, std::ptr::null_mut()) == 0
     }
 }
 
@@ -670,5 +697,30 @@ mod tests {
         let code = session.wait_exit().expect("wait exit");
         // Killed by SIGKILL (9): exit code = 128 + 9 = 137
         assert_eq!(code, 137, "SIGKILL should produce exit code 137");
+    }
+
+    #[test]
+    fn child_signal_dispositions_are_reset_before_exec() {
+        let pid = unsafe { libc::fork() };
+        assert!(pid >= 0, "fork should succeed");
+        if pid == 0 {
+            unsafe {
+                for signal in CHILD_SIGNALS {
+                    libc::signal(signal, libc::SIG_IGN);
+                }
+                reset_child_signals();
+                for signal in CHILD_SIGNALS {
+                    if libc::signal(signal, libc::SIG_IGN) != libc::SIG_DFL {
+                        libc::_exit(1);
+                    }
+                }
+                libc::_exit(0);
+            }
+        }
+
+        let mut status = 0;
+        assert_eq!(unsafe { libc::waitpid(pid, &mut status, 0) }, pid);
+        assert!(libc::WIFEXITED(status));
+        assert_eq!(libc::WEXITSTATUS(status), 0);
     }
 }

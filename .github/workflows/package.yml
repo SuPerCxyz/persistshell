@@ -13,9 +13,11 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  linux-packages:
-    name: Linux packages
-    runs-on: ubuntu-latest
+  ubuntu-2604:
+    name: Ubuntu 26.04 packages
+    runs-on: ubuntu-26.04
+    env:
+      PERSIST_PACKAGE_PLATFORM: ubuntu-26.04
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -28,22 +30,76 @@ jobs:
       - name: Build release binaries
         run: cargo build --release --workspace --locked
 
-      - name: Install package tools
+      - name: Create packages
+        run: scripts/package-release.sh tarball deb
+
+      - name: Verify packages
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install --yes rpm
-
-      - name: Create packages
-        run: scripts/package-release.sh tarball deb rpm
+          (cd dist && sha256sum --check *.sha256)
+          tar -tzf dist/*ubuntu-26.04*.tar.gz | grep '/bin/persistd$'
+          dpkg-deb --contents dist/*.deb | grep '/usr/bin/persistd$'
+          target/release/persist --version
+          target/release/persistd --version
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: persistshell-linux-packages
+          name: persistshell-ubuntu-26.04-x86_64
           path: |
             dist/*.tar.gz
             dist/*.deb
+            dist/*.sha256
+          if-no-files-found: error
+
+  rhel9:
+    name: RHEL 9 compatible packages
+    runs-on: ubuntu-26.04
+    container: rockylinux:9
+    env:
+      PERSIST_PACKAGE_PLATFORM: rhel9
+      PERSIST_PACKAGE_RPM_RELEASE: 1.el9
+    steps:
+      - name: Install build tools
+        run: dnf install --assumeyes binutils curl-minimal findutils gcc git gzip rpm-build tar
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal --default-toolchain stable -y
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Build release binaries
+        run: "$HOME/.cargo/bin/cargo" build --release --workspace --locked
+
+      - name: Check RHEL 9 ABI
+        run: |
+          set -euo pipefail
+          for binary in target/release/persist target/release/persistd; do
+            max_glibc=$(objdump -T "$binary" | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -n 1 | cut -d_ -f2)
+            test -n "$max_glibc"
+            test "$(printf '%s\n' "$max_glibc" 2.34 | sort -V | tail -n 1)" = 2.34
+            "$binary" --version
+          done
+
+      - name: Create packages
+        run: scripts/package-release.sh tarball rpm
+
+      - name: Verify packages
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum --check *.sha256)
+          tar -tzf dist/*rhel9*.tar.gz | grep '/bin/persistd$'
+          rpm --query --package --list dist/*.el9.x86_64.rpm | grep '/usr/bin/persistd$'
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: persistshell-rhel9-x86_64
+          path: |
+            dist/*.tar.gz
             dist/*.rpm
             dist/*.sha256
           if-no-files-found: error

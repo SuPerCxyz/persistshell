@@ -303,33 +303,34 @@ Usage:
   persist <command>
 
 Available now:
-  help          Show this help
-  version       Show version information
-  doctor        Show local skeleton diagnostics
-  config        Show effective configuration
-  daemon start  Start the persist daemon
-  daemon stop   Stop the persist daemon
-  daemon status Check daemon status
-  new                    Create a new session
-  ls [--tag <tag>]       List sessions, optionally filtered by tag
-  ps <id>                Show the foreground process tree
-  stats <id>             Show foreground process resource counters
-  snapshot <id>          Show a bounded session JSON snapshot
-  metrics                Show daemon and session metrics
-  attach                 Attach to a session
-  close <id>    Close a session gracefully
-  kill <id>     Force kill a session
-  log <id>              Show session output log
-   log search <keyword> [--session <id>] [-i]  Search session logs
-  rename <id> <name>    Rename a session
-   note <id> [text]    Show or set a session note (empty text to clear)
-    tag <id> <add|remove|list> [<tag>]  Manage session tags
-    pin <id>    Pin (favorite) a session
-   unpin <id>   Unpin a session
-  detach <id>           Detach a session (disconnect the active client)
-  replay <id> [--tail <n>] [--head <n>] [--speed <f>] [--follow]  Replay session history
-  install       Install shell hook for SSH auto-attach
-  uninstall     Remove shell hook (--purge to also delete all data)
+  help                              Show this help
+  version                           Show version information
+  doctor                            Show local diagnostics
+  config [show]                     Show effective configuration
+  daemon <start|stop|status>        Manage the daemon
+  new                               Create a new session
+  ls [--tag <tag>]                  List sessions
+  ps <id>                           Show the foreground process tree
+  stats <id>                        Show foreground resource counters
+  snapshot <id>                     Show a bounded JSON snapshot
+  metrics                           Show daemon and session metrics
+  attach [<id>] [--readonly]        Attach to a session
+  detach <id>                       Detach a session
+  close <id>                        Close a session gracefully
+  kill <id>                         Force kill a session
+  lock <id>                         Lock a session
+  unlock <id>                       Unlock a session
+  rename <id> <name>                Rename a session
+  note <id> [text]                  Show or set a session note
+  tag <id> <add|remove|list> [tag]  Manage session tags
+  pin <id>                          Pin a session
+  unpin <id>                        Unpin a session
+  log <id>                          Show session output log
+  log search <keyword> [options]    Search session logs
+  log export <id> [--output <path>] Export a session log
+  replay <id> [options]             Replay session history
+  install                           Install the SSH auto-attach hook
+  uninstall [--purge]               Remove the hook and optional data
 "
     )
     .map_err(|source| PersistError::Io {
@@ -884,7 +885,17 @@ mod tests {
         );
 
         assert_eq!(code, 0);
-        assert!(String::from_utf8(out).expect("utf8").contains("Usage"));
+        let help = String::from_utf8(out).expect("utf8");
+        for command in [
+            "log export",
+            "lock <id>",
+            "unlock <id>",
+            "snapshot <id>",
+            "metrics",
+            "uninstall",
+        ] {
+            assert!(help.contains(command), "help should include {command}");
+        }
         assert!(err.is_empty());
     }
 

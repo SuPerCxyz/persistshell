@@ -222,7 +222,7 @@
 
 - [x] 实现固定大小 buffer（RingBuffer in persist-core）
 - [x] 支持循环覆盖
-- [x] 支持 attach 回放（replay before ATTACH_RESP）
+- [x] 支持 attach 回放（AttachResp 后、实时 I/O 前发送受限 Stdout frames）
 - [x] 支持配置大小（config.ring_buffer.default_size）
 - [ ] 支持慢客户端丢弃策略（M12 范围外）
 - [ ] 添加 benchmark（M12 范围外）
@@ -238,6 +238,9 @@
 - [x] 支持关闭日志
 - [ ] 支持清理日志
 - [x] 支持输出日志查看
+- [ ] 为 Session 日志增加兼容时间戳格式并实现 replay `--speed`
+- [ ] 使用事件通知实现 replay `--follow`，禁止 sleep polling
+- [ ] 为快速 `cd; exit` 设计跨 Shell cwd 退出状态 side channel
 
 ### CLI
 

@@ -246,7 +246,8 @@ persist log export 2 --output session-2.log
 
 ## persist replay
 
-回放已记录的输出。`--tail`、`--head`、`--speed` 和 `--follow` 可组合使用。
+回放已记录的输出。当前 `--tail` 与 `--head` 已实现；`--speed` 和 `--follow` 可解析但尚未
+改变输出行为，详见已知限制。
 
 ```bash
 persist replay 2 --tail 200

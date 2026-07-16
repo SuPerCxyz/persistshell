@@ -70,11 +70,13 @@
 - `docs/known/LIMITATIONS.md`
 - `docs/release/RELEASE_CHECKLIST.md`
 - `docs/audit/2026-07-15-m50-release-readiness.md`
+- `docs/audit/2026-07-15-m50-platform-package-remote-validation.md`
 - `docs/adr/ADR-0000-template.md`
 - `docs/adr/ADR-0001-rust-primary-language.md`
 - `docs/design/LICENSING.md`
 
 ## 当前约束
 
-Rust runtime、PTY、daemon、IPC streaming、SSH 接管、安装器和发布包均已实现并完成阶段性验证。
-M50 已完成本地与 test 主机的发布就绪检查；远端 tag、GitHub workflow 与公开发布仍须维护者授权。
+Rust runtime、PTY、daemon、IPC streaming、SSH 接管、安装器和平台发布包均已完成阶段性验证。
+M50 已完成本地、Rocky 容器和 test 主机检查；新的 Ubuntu 26.04/RHEL 9 GitHub jobs 尚待
+推送触发，GitHub Release 与签名仍须维护者授权。

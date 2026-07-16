@@ -1,5 +1,8 @@
 # M46 发布包验证
 
+> 历史记录：本审计中的 Ubuntu 构建 RPM 方案已被 RHEL 9 ABI 实测证明不兼容。
+> 当前方案与证据见 `docs/audit/2026-07-15-m50-platform-package-remote-validation.md`。
+
 打包入口为 `scripts/package-release.sh`。它从 workspace manifest 读取版本，生成
 Linux tarball、Debian `.deb`、RPM `.rpm` 及对应 SHA-256 文件；GitHub Actions
 `package.yml` 复用此入口。

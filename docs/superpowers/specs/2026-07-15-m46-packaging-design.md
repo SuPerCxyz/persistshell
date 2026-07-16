@@ -2,8 +2,9 @@
 
 ## 目标
 
-统一生成 Linux tarball、Debian `.deb`、RPM `.rpm` 和 SHA-256 checksum。打包逻辑位于
-`scripts/package-release.sh`，GitHub Actions 只负责准备工具链和上传 artifact。
+统一生成带平台标识的 Linux tarball、Debian `.deb`、RPM `.rpm` 和 SHA-256 checksum。
+打包逻辑位于 `scripts/package-release.sh`，GitHub Actions 分别准备 Ubuntu 26.04 与 EL9
+用户空间并上传独立 artifact。
 
 ## 内容
 
@@ -13,8 +14,8 @@ manifest。
 
 ## 验证
 
-本机构建 tarball、deb 与 checksum，使用 `dpkg-deb --info/--contents` 校验。若缺少
-`rpmbuild`，本机记录跳过；GitHub Actions 在 Ubuntu runner 安装 `rpm` 后构建并上传 rpm。
+Ubuntu 26.04 构建 tarball/deb；`rockylinux:9` 构建 RHEL 9 tarball 与 `.el9` RPM，并校验
+二进制最高 GLIBC 需求不超过 2.34。每个平台在上传前检查版本、包内容和 checksum。
 
 ## 非目标
 

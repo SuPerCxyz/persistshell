@@ -22,7 +22,7 @@ M50：v1.0 Release Readiness
 
 ## 当前唯一任务
 
-完成 GitHub artifact 下载复核，并由维护者决定 GitHub Release 和签名策略。
+提交并推送平台打包与远程验证修复，触发 GitHub workflow 实测。
 
 ### 前置已完成
 
@@ -36,16 +36,19 @@ M50：v1.0 Release Readiness
 
 ## 任务范围
 
-- 使用具备 Actions artifact 读取权限的 GitHub 身份下载 artifact，独立复核 checksum 与内容。
-- 按维护者决定创建 GitHub Release、发布说明和可选签名。
+- 提交当前已通过本地与 test 验证的代码和文档。
+- 经维护者确认后推送到自建 Git，并等待同步到 GitHub mirror。
+- 手动触发 Package workflow，复核两个平台 job 与 artifact。
+- 暂不创建 GitHub Release，不改写 `v0.1.0` tag。
 
 ---
 
 ## 完成标准
 
-1. 下载的 release artifact 均能独立校验 checksum，内容符合 `docs/release/RELEASE_CHECKLIST.md`。
-2. GitHub Release、发布说明和签名状态均按维护者决定记录。
-3. release checklist 与审计记录补充 artifact 复核和最终发布决策。
+1. 自建 Git 与 GitHub mirror 指向同一已验证提交。
+2. Ubuntu 26.04 和 RHEL 9 Package job 均通过。
+3. 两个平台 artifact 可下载并独立校验 checksum、内容与运行时 ABI。
+4. 审计记录补充 GitHub run ID 和 artifact digest。
 
 ---
 

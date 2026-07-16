@@ -57,3 +57,11 @@ Unicode-3.0 或 Unlicense 等宽松许可路径；其中 `r-efi` 的 LGPL-2.1-or
 2. 决定 GitHub Release、artifact 附件和签名策略。
 
 详细操作顺序见 `docs/release/RELEASE_CHECKLIST.md`。本审计不把这些未执行动作标记为完成。
+
+## Tag 后平台兼容性复核
+
+后续 Rocky Linux 9.7 安装测试证明，历史 `v0.1.0` GitHub workflow 在 Ubuntu 上构建的通用
+tarball 依赖 `GLIBC_2.39`，不能作为 RHEL 9 二进制。`master` 已改为 Ubuntu 26.04 与
+Rocky Linux 9 独立构建，并修复远程全功能测试发现的 runtime 缺陷。历史 tag 和 artifact
+保持不变；新 workflow 尚待推送触发。完整证据见
+`docs/audit/2026-07-15-m50-platform-package-remote-validation.md`。

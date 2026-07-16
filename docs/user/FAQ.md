@@ -102,6 +102,9 @@ PERSIST_DISABLE=1 ssh node
 exit code。之后 `persist attach <id>` 会创建新的可写 PTY；只恢复 `TERM`、`COLORTERM`、
 `LANG` 与 `LC_*`，Shell 运行期间动态 export 的变量不保证恢复。
 
+cwd 依赖 `/proc` 周期采样。若在一次采样间隔内执行 `cd` 后立即退出，可能保留上一次成功
+采样的目录；正常运行窗口内的 cwd 会随 Closed Session 恢复。
+
 ---
 
 ## 如何卸载？

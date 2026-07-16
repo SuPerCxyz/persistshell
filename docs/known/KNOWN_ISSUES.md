@@ -153,3 +153,25 @@ persistd help
 处理计划：
 
 - 后续安装器任务中增加备份、fish profile 支持和配置字段接入。
+
+---
+
+## KI-0007：快速 `cd; exit` 可能保留上一次 cwd
+
+状态：已知恢复精度限制。
+
+说明：cwd 来自 `/proc/<shell-pid>/cwd` 采样。shell 在下一次采样前退出时，进程进入 zombie
+后无法再读取最终 cwd。正常运行窗口内的 cwd 与 closed attach 恢复已通过测试。
+
+处理计划：为受支持 Shell 设计不会解析用户命令的退出状态 side channel。
+
+---
+
+## KI-0008：Replay speed/follow 参数尚未生效
+
+状态：已知功能缺口。
+
+说明：`--head`、`--tail` 已生效；`--speed` 与 `--follow` 当前只解析参数。现有纯文本日志
+没有时间戳，无法还原原始输出间隔。
+
+处理计划：先定义兼容旧日志的时间信息格式，再用 Linux 事件通知实现 follow。

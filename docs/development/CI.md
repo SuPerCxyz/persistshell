@@ -62,11 +62,10 @@ cargo test --workspace --all-features
 - tag push，例如 `v*`
 - workflow_dispatch
 
-当前发布包构建必须能生成：
+当前发布包构建必须按运行时 ABI 分开生成：
 
-- Linux tarball
-- Debian `.deb`
-- RPM `.rpm`
+- Ubuntu 26.04 x86_64 tarball 与 Debian `.deb`
+- RHEL 9 x86_64 tarball 与 `.el9` RPM
 - SHA256 checksums
 
 后续发布阶段应支持：
@@ -75,24 +74,28 @@ cargo test --workspace --all-features
 - artifact upload
 - 可选签名
 
-本地先构建 release binaries，再执行：
+本地先在目标用户空间构建 release binaries，再执行对应格式：
 
 ```text
 cargo build --release --workspace --locked
-scripts/package-release.sh tarball deb rpm
+PERSIST_PACKAGE_PLATFORM=ubuntu-26.04 scripts/package-release.sh tarball deb
+PERSIST_PACKAGE_PLATFORM=rhel9 PERSIST_PACKAGE_RPM_RELEASE=1.el9 \
+  scripts/package-release.sh tarball rpm
 ```
 
-本机没有 `rpmbuild` 时，RPM 构建会明确失败；GitHub
-`ubuntu-latest` runner 在 package workflow 中安装 `rpm` 后构建全部三种包。
+GitHub `ubuntu-26.04` runner 原生构建 Ubuntu 包。RHEL 9 包在 `rockylinux:9` job container
+中原生构建，并拒绝最高 GLIBC 需求超过 2.34 的二进制。禁止在 Ubuntu 上构建二进制后再包装
+成 RHEL RPM。
 
 GitHub Actions 构建出的包必须作为 workflow artifacts 上传，tag release 时可进一步附加到 GitHub Release。
 
 ## Target Platforms
 
-Phase 1 推荐先支持：
+Phase 1 当前支持：
 
 ```text
-x86_64-unknown-linux-gnu
+Ubuntu 26.04 x86_64
+RHEL 9 compatible x86_64
 ```
 
 后续再扩展：
@@ -133,10 +136,10 @@ aarch64-unknown-linux-musl
 推荐命名：
 
 ```text
-persistshell-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
-persistshell-v0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
+persistshell-v0.1.0-ubuntu-26.04-x86_64-unknown-linux-gnu.tar.gz
+persistshell-v0.1.0-rhel9-x86_64-unknown-linux-gnu.tar.gz
 persistshell_0.1.0_amd64.deb
-persistshell-0.1.0-1.x86_64.rpm
+persistshell-0.1.0-1.el9.x86_64.rpm
 ```
 
 ## GitHub Mirror Rule
