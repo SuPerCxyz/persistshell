@@ -72,7 +72,8 @@ jobs:
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Build release binaries
-        run: "$HOME/.cargo/bin/cargo" build --release --workspace --locked
+        run: |
+          "$HOME/.cargo/bin/cargo" build --release --workspace --locked
 
       - name: Check RHEL 9 ABI
         run: |
