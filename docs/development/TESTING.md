@@ -341,3 +341,6 @@ PTY/E2E 测试可以分为 privileged 或 nightly。
 没有回归测试的 bug 修复不算完成。
 
 没有压力测试数据的性能优化不算完成。
+
+M51 的交互式命令历史、Shell 配置兼容、包内容和 Rocky TTY 部署证据记录在
+`docs/audit/2026-07-16-m51-interactive-history-validation.md`。

@@ -158,8 +158,10 @@ persist ls --tag work
 下一页查看更早记录，上一页返回较新记录。多行命令作为一条记录显示。查看结束后仍回到 Session
 菜单，可以 attach 当前 Session，也可以返回列表选择其他 Session。
 
-实时命令历史只镜像已被 Shell 原生 history 接受的命令，不读取 PTY 原始输入。用户已有的
-`HISTCONTROL`、`HISTIGNORE`、`zshaddhistory` 和 `fish_should_add_to_history` 继续生效。
+实时命令历史只镜像已被 Shell 原生 history 接受的命令，不读取 PTY 原始输入。bash 的
+`HISTCONTROL` 和 `HISTIGNORE` 继续生效。检测到自定义 `zshaddhistory`、zsh history 过滤选项或
+`fish_should_add_to_history` 时，PersistShell 为避免绕过或重复执行用户过滤逻辑，会停用该
+Session 的实时镜像，并在历史视图中明确提示；原生 history、用户 hook 和 attach 不受影响。
 密码程序直接从终端读取的密码不会记录；写在普通命令行中的 token 或密码仍应通过 Shell 自身
 history 规则排除。
 

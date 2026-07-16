@@ -60,10 +60,11 @@ PersistShell 使用独立、结构化的命令记录文件，不解析 PTY stdin
 - zsh：使用 `add-zsh-hook precmd` 追加独立函数，不改变 history options。
 - fish：使用进程级初始化命令和原生 history 接口，不写入 `config.fish`。
 
-hook 只读取已被 Shell 原生 history 接受的最新命令，再调用受限内部写入入口。用户已有的
-`HISTCONTROL`、`HISTIGNORE`、`zshaddhistory` 和 `fish_should_add_to_history` 继续生效。密码程序
-从终端读取的内容不会进入 Shell history，因此不会记录。包含内联 secret 的普通命令仍遵循
-用户 Shell 自身的 history 策略，手册必须提示该边界。
+hook 只读取已被 Shell 原生 history 接受的最新命令，再调用受限内部写入入口。bash 的
+`HISTCONTROL` 和 `HISTIGNORE` 继续生效。自定义 `zshaddhistory`、zsh history 过滤选项和
+`fish_should_add_to_history` 不能在不重复执行用户逻辑的前提下安全复用，因此检测到时停用实时
+镜像并标记不可用。密码程序从终端读取的内容不会进入 Shell history，因此不会记录。包含内联
+secret 的普通命令仍遵循用户 Shell 自身的 history 策略，手册必须提示该边界。
 
 ## 配置兼容和降级
 - 禁止编辑任何用户 dotfile。

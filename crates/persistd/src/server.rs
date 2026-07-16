@@ -525,18 +525,10 @@ impl SessionManager {
     }
 
     fn create_with_shell(&mut self, shell: Option<&str>) -> Result<u32> {
-        let engine = PtyEngine::new();
         let id = self.next_id;
         self.next_id += 1;
-        let histfile_path = self.history_dir.join(id.to_string());
-        if let Some(parent) = histfile_path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let histfile_str = histfile_path.to_string_lossy().to_string();
-        let pty = match shell {
-            Some(s) => engine.open_session_with_shell(s, Some(&histfile_str))?,
-            None => engine.open_session_with_shell(&detect_shell(), Some(&histfile_str))?,
-        };
+        let selected_shell = shell.map(str::to_owned).unwrap_or_else(detect_shell);
+        let pty = self.open_shell(id, &selected_shell, None, &[])?;
         let actual_shell = pty.shell().to_string();
         let name = generate_session_name(&actual_shell);
         self.insert_runtime(id, name, pty);
@@ -558,21 +550,45 @@ impl SessionManager {
         {
             return Err(PersistError::invalid_argument("session is already running"));
         }
+        let selected_shell = shell.map(str::to_owned).unwrap_or_else(detect_shell);
+        let pty = self.open_shell(id, &selected_shell, cwd, environment)?;
+        self.next_id = self.next_id.max(id.saturating_add(1));
+        self.insert_runtime(id, name, pty);
+        Ok(())
+    }
+
+    fn open_shell(
+        &self,
+        id: u32,
+        shell: &str,
+        cwd: Option<&Path>,
+        environment: &[(String, String)],
+    ) -> Result<PtySession> {
         let histfile_path = self.history_dir.join(id.to_string());
         if let Some(parent) = histfile_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let histfile = histfile_path.to_string_lossy().to_string();
-        let selected_shell = shell.map(str::to_owned).unwrap_or_else(detect_shell);
-        let pty = PtyEngine::new().open_session_with_context(
-            &selected_shell,
-            Some(&histfile),
-            cwd,
-            environment,
-        )?;
-        self.next_id = self.next_id.max(id.saturating_add(1));
-        self.insert_runtime(id, name, pty);
-        Ok(())
+        let histfile = histfile_path.to_string_lossy().into_owned();
+        let launch = crate::shell_history::helper_path().and_then(|helper| {
+            crate::shell_history::prepare(shell, id, &self.history_dir, &helper)
+                .ok()
+                .flatten()
+        });
+        let engine = PtyEngine::new();
+        match launch {
+            Some(launch) => {
+                let mut merged_environment = environment.to_vec();
+                merged_environment.extend(launch.environment);
+                engine.open_session_with_context_and_args(
+                    shell,
+                    Some(&histfile),
+                    cwd,
+                    &merged_environment,
+                    &launch.arguments,
+                )
+            }
+            None => engine.open_session_with_context(shell, Some(&histfile), cwd, environment),
+        }
     }
 
     fn insert_runtime(&mut self, id: u32, name: String, pty: PtySession) {

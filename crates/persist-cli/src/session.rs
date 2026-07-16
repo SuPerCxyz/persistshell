@@ -5,8 +5,8 @@ use persist_ipc::{
     decode_list_sessions_resp, decode_new_session_resp, decode_note_get_resp, decode_op_resp,
     decode_process_stats_resp, decode_process_tree_resp, decode_tag_list_resp, encode_detach,
     encode_lock, encode_note, encode_pin, encode_rename, encode_tag, read_frame, write_frame,
-    DetachPayload, Frame, LockPayload, MessageType, NotePayload, OpRespPayload, PinPayload,
-    RenamePayload, TagPayload,
+    DetachPayload, Frame, ListSessionsRespPayload, LockPayload, MessageType, NotePayload,
+    OpRespPayload, PinPayload, RenamePayload, TagPayload,
 };
 
 pub fn new_session(config: &Config) -> Result<()> {
@@ -157,7 +157,30 @@ pub fn metrics(config: &Config) -> Result<()> {
     Ok(())
 }
 
-pub fn list_sessions(config: &Config, tag_filter: Option<&str>) -> Result<()> {
+pub fn list_sessions<W: Write>(
+    config: &Config,
+    tag_filter: Option<&str>,
+    output: &mut W,
+) -> Result<()> {
+    let list = fetch_sessions(config, tag_filter)?;
+    write_session_list(output, &list)
+}
+
+pub fn list_session<W: Write>(config: &Config, session_id: u32, output: &mut W) -> Result<()> {
+    let mut list = fetch_sessions(config, None)?;
+    list.sessions.retain(|entry| entry.session_id == session_id);
+    if list.sessions.is_empty() {
+        return Err(PersistError::invalid_argument(format!(
+            "session {session_id} was not found"
+        )));
+    }
+    write_session_list(output, &list)
+}
+
+pub fn fetch_sessions(
+    config: &Config,
+    tag_filter: Option<&str>,
+) -> Result<ListSessionsRespPayload> {
     let mut socket = connect_and_hello(config)?;
 
     match tag_filter {
@@ -192,20 +215,23 @@ pub fn list_sessions(config: &Config, tag_filter: Option<&str>) -> Result<()> {
             "expected LIST_SESSIONS_RESP",
         ));
     }
-    let list = decode_list_sessions_resp(&resp.payload)
-        .ok_or_else(|| PersistError::invalid_argument("invalid LIST_SESSIONS_RESP payload"))?;
+    decode_list_sessions_resp(&resp.payload)
+        .ok_or_else(|| PersistError::invalid_argument("invalid LIST_SESSIONS_RESP payload"))
+}
 
+pub fn write_session_list<W: Write>(output: &mut W, list: &ListSessionsRespPayload) -> Result<()> {
     if list.sessions.is_empty() {
-        println!("(no sessions)");
+        writeln!(output, "(no sessions)").map_err(write_list_error)?;
         return Ok(());
     }
 
-    // Header
-    println!(
+    writeln!(
+        output,
         "{:<5}  {:<7}  {:<20}  {:<20}  {:<8}  {:<10}  {:<4}  {:<4}  {:<4}  {:<4}  CLOSED",
         "ID", "STATUS", "NAME", "FOREGROUND", "IDLE", "EXIT", "NOTE", "TAGS", "PIN", "LOCK"
-    );
-    println!("{}", "-".repeat(118));
+    )
+    .map_err(write_list_error)?;
+    writeln!(output, "{}", "-".repeat(118)).map_err(write_list_error)?;
 
     for entry in &list.sessions {
         let code = entry
@@ -223,7 +249,8 @@ pub fn list_sessions(config: &Config, tag_filter: Option<&str>) -> Result<()> {
         let tags_indicator = if entry.has_tags { "🏷" } else { "" };
         let pin_indicator = if entry.is_pinned { "📌" } else { "" };
         let lock_indicator = if entry.is_locked { "🔒" } else { "" };
-        println!(
+        writeln!(
+            output,
             "{:<5}  {:<7}  {:<20}  {:<20}  {:<8}  {:<10}  {:<4}  {:<4}  {:<4}  {:<4}  {}",
             entry.session_id,
             entry.status,
@@ -236,9 +263,17 @@ pub fn list_sessions(config: &Config, tag_filter: Option<&str>) -> Result<()> {
             pin_indicator,
             lock_indicator,
             closed
-        );
+        )
+        .map_err(write_list_error)?;
     }
     Ok(())
+}
+
+fn write_list_error(source: std::io::Error) -> PersistError {
+    PersistError::Io {
+        operation: "write session list",
+        source,
+    }
 }
 
 fn foreground_display<'a>(cmd: &'a str, name: &'a str) -> &'a str {

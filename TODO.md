@@ -361,7 +361,7 @@
 - [-] GitHub Release、artifact 附件、签名与 SBOM（维护者决定暂缓）
 - [x] User documentation complete（M49：命令、配置、安装、FAQ 一致性审计）
 - [x] Troubleshooting guide complete（M49：daemon、socket、权限、恢复、日志和绕过）
-- [~] M51：编写单文件完整用户手册并接入三种发布包验证
-- [~] M51：`persist ls` 支持 TTY 交互选择和 `persist ls <id>` 菜单
-- [~] M51：bash/zsh/fish 实时命令历史，不修改用户 dotfile 或覆盖已有 hook
-- [~] M51：命令历史最新优先分页、0600 权限及 10,000 条/4 MiB 上限
+- [x] M51：编写单文件完整用户手册并接入三种发布包验证
+- [x] M51：`persist ls` 支持 TTY 交互选择和 `persist ls <id>` 菜单
+- [x] M51：bash/zsh/fish 实时命令历史，不修改用户 dotfile 或覆盖已有 hook
+- [x] M51：命令历史最新优先分页、0600 权限及 10,000 条/4 MiB 上限

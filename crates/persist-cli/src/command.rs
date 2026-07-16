@@ -15,7 +15,13 @@ pub enum Command {
     },
     New,
     List {
+        session_id: Option<u32>,
         tag_filter: Option<String>,
+        plain: bool,
+    },
+    HistoryAppend {
+        session_id: u32,
+        shell: String,
     },
     ProcessTree {
         session_id: u32,
@@ -92,19 +98,25 @@ pub fn parse_command(args: &[String]) -> Result<Command> {
             action: args.get(1).cloned(),
         }),
         Some("new") => Ok(Command::New),
-        Some("ls") => {
-            let rest: Vec<&str> = args[1..].iter().map(String::as_str).collect();
-            let tag_filter = match rest.as_slice() {
-                ["--tag", t] | ["-t", t] => Some(t.to_string()),
-                [] => None,
-                [other, ..] => {
-                    return Err(PersistError::invalid_argument(format!(
-                        "unexpected argument for ls: {other}"
-                    )));
-                }
-            };
-            Ok(Command::List { tag_filter })
+        Some("__history-append") => {
+            let session_id = args.get(1).and_then(|id| id.parse().ok()).ok_or_else(|| {
+                PersistError::invalid_argument(
+                    "usage: persist __history-append <session_id> <shell>",
+                )
+            })?;
+            let shell = args.get(2).cloned().ok_or_else(|| {
+                PersistError::invalid_argument(
+                    "usage: persist __history-append <session_id> <shell>",
+                )
+            })?;
+            if args.len() != 3 || !matches!(shell.as_str(), "bash" | "zsh" | "fish") {
+                return Err(PersistError::invalid_argument(
+                    "usage: persist __history-append <session_id> <bash|zsh|fish>",
+                ));
+            }
+            Ok(Command::HistoryAppend { session_id, shell })
         }
+        Some("ls") => parse_list_command(&args[1..]),
         Some("ps") => {
             let session_id = args
                 .get(1)
@@ -419,6 +431,49 @@ pub fn parse_command(args: &[String]) -> Result<Command> {
     }
 }
 
+fn parse_list_command(args: &[String]) -> Result<Command> {
+    let mut session_id = None;
+    let mut tag_filter = None;
+    let mut plain = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--plain" => {
+                plain = true;
+                index += 1;
+            }
+            "--tag" | "-t" => {
+                let tag = args
+                    .get(index + 1)
+                    .ok_or_else(|| PersistError::invalid_argument("--tag requires a value"))?;
+                tag_filter = Some(tag.clone());
+                index += 2;
+            }
+            value if session_id.is_none() => {
+                session_id = Some(value.parse::<u32>().map_err(|_| {
+                    PersistError::invalid_argument(format!("invalid session_id: {value}"))
+                })?);
+                index += 1;
+            }
+            other => {
+                return Err(PersistError::invalid_argument(format!(
+                    "unexpected argument for ls: {other}"
+                )));
+            }
+        }
+    }
+    if session_id.is_some() && (tag_filter.is_some() || plain) {
+        return Err(PersistError::invalid_argument(
+            "persist ls <id> cannot be combined with --tag or --plain",
+        ));
+    }
+    Ok(Command::List {
+        session_id,
+        tag_filter,
+        plain,
+    })
+}
+
 fn parse_config_command(args: &[String]) -> Result<Command> {
     match args {
         [] => Ok(Command::Config),
@@ -471,8 +526,38 @@ mod tests {
     fn parses_ls() {
         assert_eq!(
             parse_command(&["ls".to_string()]).expect("parse"),
-            Command::List { tag_filter: None }
+            Command::List {
+                session_id: None,
+                tag_filter: None,
+                plain: false,
+            }
         );
+    }
+
+    #[test]
+    fn parses_hidden_history_append() {
+        assert_eq!(
+            parse_command(&[
+                "__history-append".to_string(),
+                "42".to_string(),
+                "bash".to_string(),
+            ])
+            .expect("parse"),
+            Command::HistoryAppend {
+                session_id: 42,
+                shell: "bash".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_history_shell() {
+        assert!(parse_command(&[
+            "__history-append".to_string(),
+            "42".to_string(),
+            "ksh".to_string(),
+        ])
+        .is_err());
     }
 
     #[test]
@@ -481,7 +566,9 @@ mod tests {
             parse_command(&["ls".to_string(), "--tag".to_string(), "work".to_string()])
                 .expect("parse"),
             Command::List {
-                tag_filter: Some("work".to_string())
+                session_id: None,
+                tag_filter: Some("work".to_string()),
+                plain: false,
             }
         );
     }
@@ -492,8 +579,47 @@ mod tests {
             parse_command(&["ls".to_string(), "-t".to_string(), "work".to_string()])
                 .expect("parse"),
             Command::List {
-                tag_filter: Some("work".to_string())
+                session_id: None,
+                tag_filter: Some("work".to_string()),
+                plain: false,
             }
+        );
+    }
+
+    #[test]
+    fn parses_ls_with_session_id() {
+        assert_eq!(
+            parse_command(&["ls".to_string(), "12".to_string()]).expect("parse"),
+            Command::List {
+                session_id: Some(12),
+                tag_filter: None,
+                plain: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_plain_tagged_ls() {
+        assert_eq!(
+            parse_command(&[
+                "ls".to_string(),
+                "--plain".to_string(),
+                "--tag".to_string(),
+                "work".to_string(),
+            ])
+            .expect("parse"),
+            Command::List {
+                session_id: None,
+                tag_filter: Some("work".to_string()),
+                plain: true,
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_ls_id_with_plain() {
+        assert!(
+            parse_command(&["ls".to_string(), "12".to_string(), "--plain".to_string(),]).is_err()
         );
     }
 

@@ -19,18 +19,30 @@ where
 {
     let mut stdout = io::stdout();
     let mut stderr = io::stderr();
-    let code = run_with_io(args, &mut stdout, &mut stderr);
+    let code = run_with_io_mode(args, &mut stdout, &mut stderr, stdio_is_tty());
     ExitCode::from(code)
 }
 
+#[cfg(test)]
 pub fn run_with_io<I, W, E>(args: I, stdout: &mut W, stderr: &mut E) -> u8
 where
     I: IntoIterator<Item = String>,
     W: Write,
     E: Write,
 {
+    run_with_io_mode(args, stdout, stderr, false)
+}
+
+fn run_with_io_mode<I, W, E>(args: I, stdout: &mut W, stderr: &mut E, interactive: bool) -> u8
+where
+    I: IntoIterator<Item = String>,
+    W: Write,
+    E: Write,
+{
     let args = args.into_iter().skip(1).collect::<Vec<_>>();
-    match parse_command(&args).and_then(|command| execute_with_optional_config(command, stdout)) {
+    match parse_command(&args)
+        .and_then(|command| execute_with_optional_config(command, stdout, interactive))
+    {
         Ok(()) => 0,
         Err(error) => {
             let _ = writeln!(stderr, "{}", error.user_facing("persist"));
@@ -42,16 +54,21 @@ where
 fn execute_with_optional_config<W: Write>(
     command: Command,
     stdout: &mut W,
+    interactive: bool,
 ) -> Result<(), PersistError> {
     if command_uses_config(&command) {
         let options = ConfigLoadOptions::from_environment()?;
         let config = load_config(&options)?;
-        init_logging(config.internal_log.client_logger_config())?;
-        log_message(LogLevel::Info, "client", command_log_message(&command))?;
-        execute(command, stdout, Some((&options, &config)))
+        if matches!(&command, Command::HistoryAppend { .. }) {
+            init_logging(LoggerConfig::disabled())?;
+        } else {
+            init_logging(config.internal_log.client_logger_config())?;
+            log_message(LogLevel::Info, "client", command_log_message(&command))?;
+        }
+        execute(command, stdout, Some((&options, &config)), interactive)
     } else {
         init_logging(LoggerConfig::disabled())?;
-        execute(command, stdout, None)
+        execute(command, stdout, None, interactive)
     }
 }
 
@@ -64,6 +81,7 @@ fn command_uses_config(command: &Command) -> bool {
             | Command::Attach { .. }
             | Command::New
             | Command::List { .. }
+            | Command::HistoryAppend { .. }
             | Command::ProcessTree { .. }
             | Command::ProcessStats { .. }
             | Command::Snapshot { .. }
@@ -95,6 +113,7 @@ fn command_log_message(command: &Command) -> &'static str {
         Command::Attach { .. } => "command=attach started",
         Command::New => "command=new started",
         Command::List { .. } => "command=ls started",
+        Command::HistoryAppend { .. } => "command=history_append started",
         Command::ProcessTree { .. } => "command=ps started",
         Command::ProcessStats { .. } => "command=stats started",
         Command::Snapshot { .. } => "command=snapshot started",
@@ -120,6 +139,7 @@ fn execute<W: Write>(
     command: Command,
     stdout: &mut W,
     loaded_config: Option<(&ConfigLoadOptions, &Config)>,
+    interactive: bool,
 ) -> Result<(), PersistError> {
     match command {
         Command::Help => write_help(stdout),
@@ -159,11 +179,32 @@ fn execute<W: Write>(
                 .ok_or_else(|| PersistError::internal_error("config not loaded"))?;
             crate::session::new_session(config)
         }
-        Command::List { tag_filter } => {
+        Command::List {
+            session_id,
+            tag_filter,
+            plain,
+        } => {
             let config = loaded_config
                 .map(|(_, c)| c)
                 .ok_or_else(|| PersistError::internal_error("config not loaded"))?;
-            crate::session::list_sessions(config, tag_filter.as_deref())
+            if interactive && !plain {
+                crate::session_browser::browse(config, session_id, tag_filter.as_deref())
+            } else if let Some(session_id) = session_id {
+                crate::session::list_session(config, session_id, stdout)
+            } else {
+                crate::session::list_sessions(config, tag_filter.as_deref(), stdout)
+            }
+        }
+        Command::HistoryAppend { session_id, shell } => {
+            let config = loaded_config
+                .map(|(_, c)| c)
+                .ok_or_else(|| PersistError::internal_error("config not loaded"))?;
+            crate::command_history::append_from_reader(
+                config,
+                session_id,
+                &shell,
+                io::stdin().lock(),
+            )
         }
         Command::ProcessTree { session_id } => {
             let config = loaded_config
@@ -293,6 +334,10 @@ fn execute<W: Write>(
     }
 }
 
+fn stdio_is_tty() -> bool {
+    unsafe { libc::isatty(libc::STDIN_FILENO) == 1 && libc::isatty(libc::STDOUT_FILENO) == 1 }
+}
+
 fn write_help<W: Write>(stdout: &mut W) -> Result<(), PersistError> {
     writeln!(
         stdout,
@@ -309,7 +354,7 @@ Available now:
   config [show]                     Show effective configuration
   daemon <start|stop|status>        Manage the daemon
   new                               Create a new session
-  ls [--tag <tag>]                  List sessions
+  ls [<id>] [--plain] [--tag <tag>] List or interactively select sessions
   ps <id>                           Show the foreground process tree
   stats <id>                        Show foreground resource counters
   snapshot <id>                     Show a bounded JSON snapshot

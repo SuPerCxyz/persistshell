@@ -43,6 +43,17 @@ impl PtyEngine {
         cwd: Option<&Path>,
         environment: &[(String, String)],
     ) -> Result<PtySession> {
+        self.open_session_with_context_and_args(shell, histfile, cwd, environment, &[])
+    }
+
+    pub fn open_session_with_context_and_args(
+        &self,
+        shell: &str,
+        histfile: Option<&str>,
+        cwd: Option<&Path>,
+        environment: &[(String, String)],
+        arguments: &[String],
+    ) -> Result<PtySession> {
         let (master_fd, slave_path) = open_pty()?;
 
         let slave_cstr = CString::new(
@@ -54,6 +65,14 @@ impl PtyEngine {
 
         let shell_cstr = CString::new(shell)
             .map_err(|_| PersistError::invalid_argument("shell path contains null bytes"))?;
+        let argument_cstr = arguments
+            .iter()
+            .map(|argument| {
+                CString::new(argument.as_str()).map_err(|_| {
+                    PersistError::invalid_argument("shell argument contains null bytes")
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
 
         let histfile_cstr = histfile
             .map(|h| {
@@ -110,15 +129,15 @@ impl PtyEngine {
                 })
             }
             0 => {
-                child_setup(
-                    slave_cstr,
-                    master_fd,
+                let context = ChildContext {
                     shell_cstr,
-                    histfile_cstr,
-                    cwd_cstr,
-                    environment_cstr,
+                    arguments: argument_cstr,
+                    histfile: histfile_cstr,
+                    cwd: cwd_cstr,
+                    environment: environment_cstr,
                     agent_socket,
-                );
+                };
+                child_setup(slave_cstr, master_fd, context);
                 unsafe { libc::_exit(127) };
             }
             pid => {
@@ -145,15 +164,24 @@ fn is_valid_agent_socket(path: &Path) -> bool {
         && std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_socket())
 }
 
-fn child_setup(
-    slave_cstr: CString,
-    master_fd: RawFd,
+struct ChildContext {
     shell_cstr: CString,
+    arguments: Vec<CString>,
     histfile: Option<CString>,
     cwd: Option<CString>,
     environment: Vec<(CString, CString)>,
     agent_socket: Option<CString>,
-) {
+}
+
+fn child_setup(slave_cstr: CString, master_fd: RawFd, context: ChildContext) {
+    let ChildContext {
+        shell_cstr,
+        arguments,
+        histfile,
+        cwd,
+        environment,
+        agent_socket,
+    } = context;
     unsafe {
         if !reset_child_signals() {
             libc::_exit(126);
@@ -196,8 +224,11 @@ fn child_setup(
             libc::setenv(hf_name.as_ptr(), hf.as_ptr(), 1);
         }
 
-        let args = [shell_cstr.as_ptr(), std::ptr::null()];
-        libc::execvp(shell_cstr.as_ptr(), args.as_ptr());
+        let mut argv = Vec::with_capacity(arguments.len() + 2);
+        argv.push(shell_cstr.as_ptr());
+        argv.extend(arguments.iter().map(|argument| argument.as_ptr()));
+        argv.push(std::ptr::null());
+        libc::execvp(shell_cstr.as_ptr(), argv.as_ptr());
     }
 }
 
@@ -526,6 +557,36 @@ mod tests {
             output.contains("/:restored"),
             "unexpected output: {output:?}"
         );
+    }
+
+    #[test]
+    fn pty_context_passes_shell_arguments() {
+        let engine = PtyEngine::new();
+        let mut session = engine
+            .open_session_with_context_and_args(
+                "/bin/sh",
+                None,
+                None,
+                &[],
+                &["-c".into(), "printf 'argument-ok\\n'; exec /bin/sh".into()],
+            )
+            .expect("open session");
+
+        let mut buf = vec![0u8; 4096];
+        let mut output = String::new();
+        for _ in 0..20 {
+            if session
+                .poll_output(Duration::from_millis(100))
+                .unwrap_or(false)
+            {
+                let n = session.read_output(&mut buf).unwrap_or(0);
+                output.push_str(&String::from_utf8_lossy(&buf[..n]));
+                if output.contains("argument-ok") {
+                    break;
+                }
+            }
+        }
+        assert!(output.contains("argument-ok"), "output was {output:?}");
     }
 
     #[test]

@@ -8,7 +8,7 @@ use persist_ipc::{
     read_frame, write_frame, AttachPayload, Frame, FrameAccumulator, MessageType, ResizePayload,
 };
 
-use crate::terminal::RawMode;
+use crate::terminal::{NonblockingMode, RawMode};
 
 static RESIZE_PENDING: AtomicBool = AtomicBool::new(false);
 
@@ -146,8 +146,8 @@ fn io_loop(stream: &mut std::os::unix::net::UnixStream) -> Result<()> {
     let socket_fd = stream.as_raw_fd();
     let stdin_fd = libc::STDIN_FILENO;
 
-    set_nonblocking(socket_fd);
-    set_nonblocking(stdin_fd);
+    let _socket_mode = NonblockingMode::enter(socket_fd)?;
+    let _stdin_mode = NonblockingMode::enter(stdin_fd)?;
 
     let mut accumulator = FrameAccumulator::new();
     let mut buf = vec![0u8; 65536];
@@ -256,7 +256,7 @@ fn io_loop(stream: &mut std::os::unix::net::UnixStream) -> Result<()> {
 
 fn io_loop_readonly(stream: &mut std::os::unix::net::UnixStream) -> Result<()> {
     let socket_fd = stream.as_raw_fd();
-    set_nonblocking(socket_fd);
+    let _socket_mode = NonblockingMode::enter(socket_fd)?;
 
     let mut accumulator = FrameAccumulator::new();
     let mut buf = [0u8; 65536];
@@ -317,15 +317,6 @@ fn io_loop_readonly(stream: &mut std::os::unix::net::UnixStream) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn set_nonblocking(fd: std::os::unix::io::RawFd) {
-    unsafe {
-        let flags = libc::fcntl(fd, libc::F_GETFL, 0);
-        if flags >= 0 {
-            libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
-        }
-    }
 }
 
 fn send_resize(stream: &mut std::os::unix::net::UnixStream) -> Result<()> {

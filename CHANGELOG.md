@@ -10,11 +10,20 @@
 
 ### Added
 
+- 新增 `persist ls` TTY 交互选择、`persist ls <id>` 直接菜单和 `--plain` 脚本模式；历史页按
+  最新优先每页 50 条显示，并可返回菜单、attach 或退出。
+- 新增有界结构化 Shell 命令历史、受限 stdin helper，以及不修改 dotfile 的 bash/zsh/fish
+  临时 hook；历史文件限制为 10,000 条或 4 MiB，父目录 `0700`、文件 `0600`。
+- 新增单文件完整用户手册，并纳入 tar、deb 和 RPM 标准文档路径。
 - GitHub Package workflow 分离 Ubuntu 26.04 与 RHEL 9 ABI 构建，分别上传带平台标识的
   tar/deb 与 tar/`.el9` RPM，并校验 checksum、包内容和 RHEL 9 GLIBC 2.34 上限。
 
 ### Fixed
 
+- 修复从 `persist ls <id>` 菜单 attach 返回后 stdin 保留 `O_NONBLOCK`、导致菜单读取
+  `EAGAIN` 的问题；文件状态 flags 现在由 RAII 守卫恢复。
+- zsh/fish 检测到自定义 history 过滤器时优先保留用户配置并明确降级，不重复调用或绕过过滤
+  逻辑；历史写入拒绝符号链接、超限和损坏文件。
 - shell 自然退出后向 writer/read-only 客户端发送 `SessionExited`，并修复 read-only stdout
   裸字节广播、attach ring replay 缺失和超大 replay frame 未分片问题。
 - PTY child 在 exec 前恢复 daemon 忽略的交互信号，Ctrl+C 可再次终止前台进程。

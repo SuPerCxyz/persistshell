@@ -106,7 +106,8 @@
 | M48 | Shell Completion | ☑ 已完成 | bash/zsh/fish completion、三种包接入和 test RPM 验证 |
 | M49 | v1.0 文档完善 | ☑ 已完成 | 用户文档、FAQ、故障排查、三种包文档验证 |
 | M50 | v0.1.0 Release | ☑ 已完成 | tag、平台 workflow、artifact 与 test 部署已验证；GitHub Release、签名和 SBOM 暂缓 |
-| M51 | 交互式命令历史与完整用户手册 | ◐ 进行中 | `persist ls` 交互选择、实时命令历史和单文件完整用户手册 |
+| M51 | 交互式命令历史与完整用户手册 | ☑ 已完成 | `persist ls` 交互选择、实时命令历史和单文件完整用户手册 |
+| M52 | Performance dashboard | ☐ 未开始 | 先明确指标、数据来源、资源边界和验收标准 |
 
 ---
 
