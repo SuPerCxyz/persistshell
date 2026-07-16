@@ -331,7 +331,14 @@ persist snapshot 2
 persist metrics
 ```
 
-这些命令不提供持续监控服务，也不保存历史性能曲线。
+打开性能仪表盘入口：
+
+```bash
+persist top
+```
+
+`persist top` 要求 stdin/stdout 均为 TTY。当前阶段已接入有界分页和趋势数据客户端；全屏图表
+和键盘交互将在后续阶段完成。`snapshot` 与 `metrics` 仍是一次性命令。
 
 ## 13. Daemon 管理
 
@@ -510,6 +517,7 @@ persist ps <id>                           查看前台进程树
 persist stats <id>                        查看前台资源计数
 persist snapshot <id>                     查看受限 JSON 快照
 persist metrics                           查看聚合指标
+persist top                              打开性能仪表盘
 persist install                           安装 SSH 自动接管 hook
 persist uninstall [--purge]               移除 hook 和可选数据
 ```

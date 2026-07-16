@@ -86,6 +86,7 @@ fn command_uses_config(command: &Command) -> bool {
             | Command::ProcessStats { .. }
             | Command::Snapshot { .. }
             | Command::Metrics
+            | Command::Top
             | Command::Close { .. }
             | Command::Kill { .. }
             | Command::Log { .. }
@@ -118,6 +119,7 @@ fn command_log_message(command: &Command) -> &'static str {
         Command::ProcessStats { .. } => "command=stats started",
         Command::Snapshot { .. } => "command=snapshot started",
         Command::Metrics => "command=metrics started",
+        Command::Top => "command=top started",
         Command::Close { .. } => "command=close started",
         Command::Kill { .. } => "command=kill started",
         Command::Log { .. } => "command=log started",
@@ -229,6 +231,12 @@ fn execute<W: Write>(
                 .map(|(_, c)| c)
                 .ok_or_else(|| PersistError::internal_error("config not loaded"))?;
             crate::session::metrics(config)
+        }
+        Command::Top => {
+            let config = loaded_config
+                .map(|(_, c)| c)
+                .ok_or_else(|| PersistError::internal_error("config not loaded"))?;
+            crate::dashboard::run(config, stdout, interactive)
         }
         Command::Close { session_id } => {
             let config = loaded_config
@@ -359,6 +367,7 @@ Available now:
   stats <id>                        Show foreground resource counters
   snapshot <id>                     Show a bounded JSON snapshot
   metrics                           Show daemon and session metrics
+  top                               Open the performance dashboard
   attach [<id>] [--readonly]        Attach to a session
   detach <id>                       Detach a session
   close <id>                        Close a session gracefully

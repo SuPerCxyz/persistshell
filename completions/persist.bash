@@ -2,7 +2,7 @@ _persist_completions() {
     local cur prev words cword
     _init_completion || return
 
-    local subcmds="-h --help -V --version help version doctor config daemon new ls ps stats snapshot metrics attach close kill log rename detach note tag pin unpin lock unlock replay install uninstall"
+    local subcmds="-h --help -V --version help version doctor config daemon new ls ps stats snapshot metrics top attach close kill log rename detach note tag pin unpin lock unlock replay install uninstall"
 
     if [[ $cword -eq 1 ]]; then
         COMPREPLY=($(compgen -W "$subcmds" -- "$cur"))
@@ -10,7 +10,7 @@ _persist_completions() {
     fi
 
     case "${words[1]}" in
-        help|version|doctor|new|metrics|install)
+        help|version|doctor|new|metrics|top|install)
             COMPREPLY=()
             ;;
         config)

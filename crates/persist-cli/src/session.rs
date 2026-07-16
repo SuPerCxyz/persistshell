@@ -520,7 +520,7 @@ pub fn log_search<W: Write>(
     Ok(())
 }
 
-fn connect_and_hello(config: &Config) -> Result<persist_ipc::ClientSocket> {
+pub(crate) fn connect_and_hello(config: &Config) -> Result<persist_ipc::ClientSocket> {
     let mut socket = persist_ipc::ClientSocket::connect(&config.paths.socket_path)?;
 
     let uid = unsafe { libc::getuid() };

@@ -59,6 +59,11 @@ text, tag text, and SSH agent paths.
 .B metrics
 Print bounded daemon and session aggregate metrics as JSON.
 .TP
+.B top
+Open the interactive performance dashboard.  This command requires a terminal;
+the current implementation validates and fetches bounded Dashboard IPC data
+before the full-screen interface starts.
+.TP
 .B close \fIID\fR
 Close a session gracefully.
 .TP

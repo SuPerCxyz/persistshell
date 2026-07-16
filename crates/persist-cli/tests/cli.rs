@@ -25,6 +25,15 @@ fn help_command_prints_usage() {
     let (ok, stdout, _) = run(&["help"]);
     assert!(ok);
     assert!(stdout.contains("Usage"));
+    assert!(stdout.contains("top"));
+}
+
+#[test]
+fn top_requires_interactive_terminal() {
+    let (ok, _, stderr) = run(&["top"]);
+    assert!(!ok);
+    assert!(stderr.contains("E_INVALID_ARGUMENT"));
+    assert!(stderr.contains("interactive terminal"));
 }
 
 #[test]

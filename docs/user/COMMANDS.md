@@ -172,6 +172,20 @@ runtime 数量、active writer 数量和只读客户端数量。它不启动 met
 
 ---
 
+## persist top
+
+打开交互式性能仪表盘入口。
+
+```bash
+persist top
+```
+
+该命令仅允许在 stdin/stdout 都是 TTY 时运行，并通过有界 Dashboard IPC 读取全部 summary
+分页。当前阶段完成命令入口、协议校验和数据客户端；全屏布局、图表和键盘交互将在后续阶段
+接入。脚本继续使用 `persist metrics`。
+
+---
+
 ## persist attach
 
 Attach 到已有 Session。省略 ID 时创建一个新 Session 后 attach。

@@ -342,7 +342,7 @@
 - [x] SSH_AUTH_SOCK sync（M40）
 - [x] Snapshot（M41）
 - [x] Metrics（M42）
-- [-] Performance dashboard（M52：daemon IPC 已完成，当前实现 CLI 数据客户端与命令入口）
+- [-] Performance dashboard（M52：CLI 数据客户端已完成，当前实现 Ratatui 全屏界面）
 
 ---
 

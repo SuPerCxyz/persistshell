@@ -21,7 +21,8 @@ _persist() {
                 'help:show help' 'version:show version' 'doctor:diagnose local setup' \
                 'config:show configuration' 'daemon:manage daemon' 'new:create session' \
                 'ls:list sessions' 'ps:show process tree' 'stats:show process counters' \
-                'snapshot:show session snapshot' 'metrics:show metrics' 'attach:attach session' \
+                'snapshot:show session snapshot' 'metrics:show metrics' \
+                'top:open performance dashboard' 'attach:attach session' \
                 'close:close session' 'kill:terminate session' 'log:read logs' \
                 'rename:rename session' 'detach:detach client' 'note:manage note' \
                 'tag:manage tags' 'pin:pin session' 'unpin:unpin session' \

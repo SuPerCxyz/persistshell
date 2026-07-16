@@ -24,6 +24,8 @@
   单轮 2 秒截止；procfs、分钟落盘、启动恢复和有界退出均不阻塞 accept、PTY 或 GC 路径。
 - 新增 daemon Dashboard summary/trend IPC：Session ID 稳定分页，15 分钟/1 小时内存趋势和
   24 小时分段趋势均限制为 240 点；磁盘读取经 writer 串行化，错误返回 Unavailable。
+- 新增 `persist top` TTY 命令入口和有界 Dashboard 客户端，校验分页游标、消息类型和 request
+  ID，并加入 5 秒刷新/有界重连策略；锁定 Ratatui 0.29/Crossterm 0.28 的兼容 MSRV 依赖链。
 - 新增 `persist ls` TTY 交互选择、`persist ls <id>` 直接菜单和 `--plain` 脚本模式；历史页按
   最新优先每页 50 条显示，并可返回菜单、attach 或退出。
 - 新增有界结构化 Shell 命令历史、受限 stdin helper，以及不修改 dotfile 的 bash/zsh/fish

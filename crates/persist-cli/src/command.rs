@@ -33,6 +33,7 @@ pub enum Command {
         session_id: u32,
     },
     Metrics,
+    Top,
     Close {
         session_id: u32,
     },
@@ -137,6 +138,8 @@ pub fn parse_command(args: &[String]) -> Result<Command> {
             Ok(Command::Snapshot { session_id })
         }
         Some("metrics") => Ok(Command::Metrics),
+        Some("top") if args.len() == 1 => Ok(Command::Top),
+        Some("top") => Err(PersistError::invalid_argument("usage: persist top")),
         Some("attach") => {
             let mut id = None;
             let mut readonly = false;
@@ -642,6 +645,12 @@ mod tests {
             parse_command(&["metrics".to_string()]).expect("parse"),
             Command::Metrics
         );
+    }
+
+    #[test]
+    fn parses_top_without_arguments() {
+        assert_eq!(parse_command(&["top".to_string()]).unwrap(), Command::Top);
+        assert!(parse_command(&["top".to_string(), "extra".to_string()]).is_err());
     }
 
     #[test]

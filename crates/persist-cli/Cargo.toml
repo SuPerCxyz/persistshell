@@ -17,3 +17,5 @@ serde_json.workspace = true
 persist-core = { path = "../persist-core" }
 persist-ipc = { path = "../persist-ipc" }
 libc = "0.2"
+ratatui = "0.29.0"
+crossterm = "0.28.1"
