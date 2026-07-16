@@ -47,6 +47,7 @@
 - `docs/development/LOGGING.md`
 - `docs/development/TESTING.md`
 - `docs/development/BENCHMARK.md`
+- `docs/benchmark/PERFORMANCE.md`
 - `docs/development/CI.md`
 
 ## 用户文档
@@ -72,6 +73,7 @@
 - `docs/release/RELEASE_CHECKLIST.md`
 - `docs/audit/2026-07-15-m50-release-readiness.md`
 - `docs/audit/2026-07-15-m50-platform-package-remote-validation.md`
+- `docs/audit/2026-07-16-m52-performance-dashboard-validation.md`
 - `docs/adr/ADR-0000-template.md`
 - `docs/adr/ADR-0001-rust-primary-language.md`
 - `docs/adr/ADR-0002-closed-session-recovery-context.md`
@@ -82,5 +84,5 @@
 ## 当前约束
 
 Rust runtime、PTY、daemon、IPC streaming、SSH 接管、安装器和平台发布包均已完成阶段性验证。
-M50 已完成本地、Rocky 容器、GitHub hosted jobs、artifact 下载和 test 主机检查；GitHub
-Release、签名与 SBOM 仍须维护者决策。
+M52 已完成有界 Performance dashboard、本地 100/1000 Session 性能门禁、平台包和 Rocky
+test 主机验证；GitHub Release、签名与 SBOM 仍须维护者决策。

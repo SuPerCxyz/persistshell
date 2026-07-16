@@ -16,13 +16,13 @@ Phase 4：发布和长期维护
 
 ## 当前里程碑
 
-M52：Performance dashboard
+待维护者确定。
 
 ---
 
 ## 当前唯一任务
 
-M52 阶段 9：完成 Performance dashboard 性能、文档、打包和 test 主机发布验证。
+确认 M52 之后的下一里程碑范围和优先级，不开始未确认的新功能实现。
 
 ### 前置已完成
 
@@ -44,33 +44,28 @@ M52 阶段 9：完成 Performance dashboard 性能、文档、打包和 test 主
   request ID 校验、5 秒刷新/有界退避策略及兼容 MSRV 的 Ratatui/Crossterm 锁定依赖。
 - 阶段 8 Ratatui 全屏界面已完成，包含 daemon 摘要、Session 稳定排序、详情趋势、紧凑终端
   降级、5 秒刷新、4 Hz 重绘上限、有界重连和 RAII 终端恢复。
+- 阶段 9 性能、文档与发布验证已完成，包含 100/1000 Session 基准、全 workspace 门禁、
+  Ubuntu tar/deb、RHEL 9 tar/RPM 和 Rocky test 主机端到端审计。
 
 ---
 
 ## 任务范围
 
-- 增加 Dashboard benchmark，比较采样关闭基线与 100/1000 个活跃 Session 的 CPU、RSS、
-  采样窗口和队列状态。
-- 验证 100 Session 平均 CPU 附加开销不超过单核 1%，并审计 64 MiB 内存、128 MiB 磁盘、
-  2 秒采样和 IPC 上限。
-- 运行全 workspace 测试、全 targets Clippy、格式检查和既有 benchmark 回归。
-- 构建 tar/deb/RPM，确认 `persist top`、新增依赖和用户手册进入发布包。
-- 部署到 `ssh test`，验证实时视图、趋势、daemon 重启恢复、终端恢复和核心 Session 回归。
-- 更新用户、协议、限制和任务状态文档，形成 M52 验证审计。
+- 审查 `TODO.md` 中仍未完成的条目，区分真实缺口、历史状态未同步和明确暂缓项。
+- 由维护者确认下一里程碑的用户价值、边界、风险和验收标准。
+- 确认后先更新设计、`MILESTONES.md`、`TODO.md` 和本文件，再开始代码实现。
 
 ---
 
 ## 完成标准
 
-1. Dashboard 性能阈值和所有容量上限具有可复现的命令输出或审计记录。
-2. 全 workspace test、全 targets Clippy、格式检查和 benchmark 回归通过。
-3. tar/deb/RPM 均包含可执行的 `persist top` 和完整文档。
-4. test 主机验证实时/历史趋势、重启恢复、全部终端退出路径和核心 Session 行为。
-5. 设计规范中的验收项全部可追溯，M52 状态文档一致且 `NEXT_TASK.md` 指向下一任务。
+1. 下一里程碑由维护者明确确认。
+2. 唯一任务、范围、禁止事项和完成标准写入本文件。
+3. 相关里程碑、TODO 和设计文档状态一致。
 
 ---
 
 ## 禁止事项
 
-不得放宽已确认的资源上限，不得为 benchmark 修改正式采样语义，不得增加 Web、鼠标依赖或
-脚本 JSON 模式。不得创建 release、tag 或远端 push；远端部署仅限已授权的 `ssh test` 主机。
+在维护者确认下一里程碑前不得开始新功能，不得把历史 TODO 直接视为当前需求。不得创建
+release、tag 或远端 push。

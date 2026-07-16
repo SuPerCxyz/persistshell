@@ -152,6 +152,15 @@ persist attach 3
 persist new
 ```
 
+查看 daemon 和运行中 Session 的实时性能：
+
+```bash
+persist top
+```
+
+`persist top` 需要真实终端，提供 15 分钟、1 小时和 24 小时趋势。完整按键和故障处理见
+`docs/user/USER_GUIDE.md`。
+
 退出当前 Shell：
 
 ```bash

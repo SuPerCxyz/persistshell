@@ -8,8 +8,8 @@
 
 ## 当前阶段
 
-Rust runtime、发布包、man page 和 shell completion 已实现并完成定向验证。当前处于 Phase 4
-文档完善阶段；本文件只记录仍未修复的实际限制或可用性问题。
+Rust runtime、发布包、完整用户手册和 Performance dashboard 已完成阶段性验证。当前处于
+Phase 4 维护阶段；本文件只记录仍未修复的实际限制或可用性问题。
 
 ---
 

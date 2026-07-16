@@ -43,6 +43,27 @@ PersistShell 关注以下指标：
 - log writer throughput
 - metadata query latency
 - 100/500/1000 session scalability
+- Dashboard 采样 CPU、RSS、线程和指标磁盘占用
+
+## Dashboard Benchmark
+
+`scripts/benchmark-dashboard.sh` 比较 M52 worker 接入前的 baseline daemon 与当前 daemon。
+baseline 必须是独立二进制，不能通过修改正式配置或采样语义模拟。
+
+```bash
+cargo build --workspace --release --locked
+PERSISTD_BASELINE_BIN=/path/to/baseline/persistd \
+PERSISTD_DASHBOARD_BIN=target/release/persistd \
+PERSIST_BIN=target/release/persist \
+scripts/benchmark-dashboard.sh
+```
+
+可通过 `PERSIST_DASHBOARD_BENCH_COUNTS`、`PERSIST_DASHBOARD_BENCH_WARMUP_SECONDS` 和
+`PERSIST_DASHBOARD_BENCH_DURATION_SECONDS` 调整用例。正式 M52 门禁使用 100/1000 Session、
+10 秒预热和 30 秒采样，100 Session 的附加 CPU 不得超过单核 1000 milli-percent（1%）。
+
+每个用例使用隔离 XDG 目录并验证 daemon socket 仍可响应。原始结果和容量审计保存在
+`docs/benchmark/PERFORMANCE.md`。
 
 ---
 

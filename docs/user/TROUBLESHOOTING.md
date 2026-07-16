@@ -112,6 +112,27 @@ PersistShell 不会为了修复实时历史而修改用户 Shell 配置。记录
 ls -l ~/.local/share/persistshell/history/2.commands
 ```
 
+## `persist top` 无法打开或显示 disconnected
+
+`persist top` 只支持真实终端，管道、重定向和非交互 SSH 会返回明确错误。先检查 daemon：
+
+```bash
+persist doctor
+persist ls --plain
+```
+
+daemon 短暂重启时，界面保留最后一次数据并显示 disconnected，随后按有界退避自动重连。
+长时间不恢复时退出界面，检查 runtime socket 和 daemon 日志：
+
+```bash
+ls -ld /run/user/$UID/persistshell
+ls -l /run/user/$UID/persistshell/persist.sock
+tail -100 /run/user/$UID/persistshell/daemon.log
+```
+
+24h 趋势按分钟写入分段，当前分钟或刚启动 daemon 时暂时没有趋势点是正常现象。Dashboard
+故障不会停止 Session、attach 或日志路径。
+
 ## 直接运行 persistd
 
 前台诊断用法：

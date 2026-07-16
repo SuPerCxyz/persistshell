@@ -28,6 +28,8 @@
   ID，并加入 5 秒刷新/有界重连策略；锁定 Ratatui 0.29/Crossterm 0.28 的兼容 MSRV 依赖链。
 - 新增 `persist top` Ratatui 全屏界面，提供 daemon 摘要、Session 稳定排序、15 分钟/1 小时/
   24 小时趋势和紧凑终端降级；退出、连接错误、`Ctrl+C` 和 panic 均恢复终端状态。
+- 新增 Dashboard 双二进制性能基准；100 Session 本地附加 CPU 为单核 0.398%，并完成
+  1000 Session、全 workspace、Ubuntu tar/deb、RHEL 9 tar/RPM 和 Rocky test 部署验证。
 - 新增 `persist ls` TTY 交互选择、`persist ls <id>` 直接菜单和 `--plain` 脚本模式；历史页按
   最新优先每页 50 条显示，并可返回菜单、attach 或退出。
 - 新增有界结构化 Shell 命令历史、受限 stdin helper，以及不修改 dotfile 的 bash/zsh/fish
