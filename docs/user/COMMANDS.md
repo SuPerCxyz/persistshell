@@ -60,7 +60,7 @@ persist version
 输出：
 
 ```text
-persist 0.1.0
+persist 0.2.0
 ```
 
 ---

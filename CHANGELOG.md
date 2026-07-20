@@ -8,6 +8,8 @@
 
 ## Unreleased
 
+## [0.2.0] - 2026-07-20
+
 ### Added
 
 - 确认 M56 通用 Linux 多架构发布包设计与 ADR：采用 glibc 2.28 单一 ABI、x86_64/

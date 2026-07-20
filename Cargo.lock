@@ -365,7 +365,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "persist-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossterm",
  "libc",
@@ -378,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "persist-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libc",
  "serde",
@@ -389,7 +389,7 @@ dependencies = [
 
 [[package]]
 name = "persist-holder"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libc",
  "persist-core",
@@ -400,7 +400,7 @@ dependencies = [
 
 [[package]]
 name = "persist-ipc"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libc",
  "persist-core",
@@ -408,7 +408,7 @@ dependencies = [
 
 [[package]]
 name = "persist-metadata"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "persist-core",
  "rusqlite",
@@ -418,7 +418,7 @@ dependencies = [
 
 [[package]]
 name = "persist-pty"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libc",
  "persist-core",
@@ -426,7 +426,7 @@ dependencies = [
 
 [[package]]
 name = "persistd"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libc",
  "persist-core",
