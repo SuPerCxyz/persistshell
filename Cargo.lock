@@ -373,6 +373,7 @@ dependencies = [
  "persist-ipc",
  "ratatui",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -381,7 +382,20 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "serde",
+ "serde_json",
+ "tempfile",
  "toml",
+]
+
+[[package]]
+name = "persist-holder"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "persist-core",
+ "persist-ipc",
+ "persist-pty",
+ "tempfile",
 ]
 
 [[package]]
@@ -398,6 +412,8 @@ version = "0.1.0"
 dependencies = [
  "persist-core",
  "rusqlite",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -16,6 +16,32 @@ persist doctor
 默认 socket 是 `/run/user/$UID/persistshell/persist.sock`。普通 `persist new`、`persist ls`
 和 `persist attach <id>` 不会自动启动 daemon；SSH hook 会先尝试 `persist daemon start`。
 
+## Holder disconnected 或 Session 显示 lost
+
+`persist daemon status` 正常应显示 Holder `connected`、PID 和 32 位十六进制 instance；同时
+`log_degraded: 0`、`lost: 0`。进一步检查：
+
+```bash
+persist daemon status
+persist doctor
+ls -l /usr/libexec/persistshell/persist-holder
+```
+
+Holder 意外退出后，daemon 可以继续响应诊断，但对应 running Session 会标记为 `lost` 且不能
+attach。日志和 metadata 不会因此删除：
+
+```bash
+persist ls --plain
+persist log <id>
+persist new
+```
+
+系统包缺少固定路径组件时，重新安装完整 deb/rpm/tar 包。release 版不会使用 `PATH` 中同名程序，
+也不会接受 `PERSIST_HOLDER_PATH`。不要手工把 `lost` metadata 改成 `running`。
+
+从旧架构升级时，升级前仍为 running 的 metadata 没有 Holder 身份，也会按上述规则标记为
+`lost`；这是明确的升级边界，不支持伪热迁移。
+
 ## socket 或目录权限错误
 
 运行目录必须为 0700，socket 必须为 0600。先停止当前用户的 daemon，再重新启动：
@@ -55,6 +81,9 @@ ssh node 'bash --noprofile --norc'
 确认需要移除 hook 时执行 `persist uninstall`；`persist uninstall --purge` 还会删除当前用户的
 PersistShell 配置、数据和状态目录。
 
+普通 `apt remove` 或 `dnf remove` 只移除发行包文件，应保留用户 metadata、历史和日志。只有
+明确执行 `persist uninstall --purge` 才删除这些用户数据。
+
 ## exit 或 Ctrl+D 后 Session 显示 closed
 
 这是预期行为：shell runtime 已释放，不会继续占用资源。先查看记录，再恢复：
@@ -65,7 +94,20 @@ persist log <id>
 persist attach <id>
 ```
 
-恢复会创建新的可写 PTY，仅恢复 cwd 与 `TERM`、`COLORTERM`、`LANG`、`LC_*` 启动环境。
+恢复会创建新的可写 PTY。默认 bash、zsh 和 fish 的正常 `exit`、空行 `Ctrl+D` 与快速
+`cd; exit` 会恢复最终 cwd、允许的已导出变量和精确 unset。当前终端/SSH/display/agent
+变量由本次 attach 提供，不使用旧连接值。
+
+若恢复到较早的 cwd，检查退出路径是否属于以下降级情况：
+
+- Bash 已有用户 `EXIT` trap，PersistShell 为保护用户配置不会替换它
+- Shell 被 `SIGKILL`，或通过 `exec` 被其他进程替换
+- 用户配置删除了临时 hook，或退出发生在未安装 hook 的嵌套 Shell
+- cwd 不是有效 UTF-8，或私有状态文件缺失、损坏、身份不匹配
+
+这些情况使用最近一次 `/proc`/metadata cwd，不影响退出。可通过 `persist log <id>` 确认
+Session 输出。环境异常时检查 `[recovery.environment]` include、变量是否 export，以及是否
+命中敏感禁区；旧 Holder 会明确降级为 cwd-only。
 
 ## 另一台电脑无法继续输入
 

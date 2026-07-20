@@ -1,6 +1,9 @@
 mod dashboard;
+mod holder;
 mod lifecycle;
+#[cfg(test)]
 mod log_writer;
+mod public_attach;
 mod server;
 mod shell_history;
 

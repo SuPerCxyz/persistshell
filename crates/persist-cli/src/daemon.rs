@@ -7,6 +7,9 @@ use std::time::Duration;
 
 use persist_core::pidfile;
 use persist_core::{Config, PersistError, Result};
+use persist_ipc::{
+    decode_note_get_resp, read_frame, write_frame, ClientSocket, Frame, MessageType,
+};
 
 pub fn daemon_start(config: &Config) -> Result<()> {
     let socket_path = &config.paths.socket_path;
@@ -182,8 +185,77 @@ pub fn daemon_status<W: Write>(config: &Config, stdout: &mut W) -> Result<()> {
     }
     let _ = writeln!(stdout, "socket: {}", config.paths.socket_path.display());
     let _ = writeln!(stdout, "socket_status: {socket_status}");
+    match read_daemon_metrics(config) {
+        Ok(metrics) => {
+            let connected = metrics
+                .pointer("/holder/connected")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false);
+            let _ = writeln!(
+                stdout,
+                "holder_status: {}",
+                if connected {
+                    "connected"
+                } else {
+                    "disconnected"
+                }
+            );
+            if let Some(holder_pid) = metrics
+                .pointer("/holder/pid")
+                .and_then(serde_json::Value::as_u64)
+            {
+                let _ = writeln!(stdout, "holder_pid: {holder_pid}");
+            }
+            if let Some(instance) = metrics
+                .pointer("/holder/instance")
+                .and_then(serde_json::Value::as_str)
+            {
+                let _ = writeln!(stdout, "holder_instance: {instance}");
+            }
+            if let Some(degraded) = metrics
+                .pointer("/sessions/log_degraded")
+                .and_then(serde_json::Value::as_u64)
+            {
+                let _ = writeln!(stdout, "log_degraded: {degraded}");
+            }
+            if let Some(lost) = metrics
+                .pointer("/sessions/lost")
+                .and_then(serde_json::Value::as_u64)
+            {
+                let _ = writeln!(stdout, "lost: {lost}");
+            }
+        }
+        Err(error) => {
+            let _ = writeln!(stdout, "holder_status: unavailable");
+            let _ = writeln!(stdout, "metrics_error: {error}");
+        }
+    }
 
     Ok(())
+}
+
+fn read_daemon_metrics(config: &Config) -> Result<serde_json::Value> {
+    let mut socket = ClientSocket::connect(&config.paths.socket_path)?;
+    socket.send_hello(unsafe { libc::getuid() }, std::process::id())?;
+    write_frame(
+        socket.stream(),
+        &Frame {
+            msg_type: MessageType::Metrics,
+            flags: 0,
+            request_id: 1,
+            payload: Vec::new(),
+        },
+    )?;
+    let response = read_frame(socket.stream())?;
+    if response.msg_type != MessageType::MetricsResp {
+        return Err(PersistError::invalid_argument(
+            "daemon returned an unexpected metrics response",
+        ));
+    }
+    let json = decode_note_get_resp(&response.payload)
+        .ok_or_else(|| PersistError::invalid_argument("daemon returned malformed metrics"))?;
+    serde_json::from_str(&json)
+        .map_err(|_| PersistError::invalid_argument("daemon returned invalid metrics JSON"))
 }
 
 fn find_daemon_binary() -> Result<PathBuf> {

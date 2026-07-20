@@ -114,10 +114,14 @@ session_id
 rows
 cols
 term
+connection_env optional
 replay
 replay_bytes optional
 mode
 ```
+
+`connection_env` 只允许 `SOCKET_PROTOCOL.md` 定义的当前终端、SSH agent 和显示变量。
+它绑定本次 Attach，不得持久化，也不得改变已运行 Session 的环境。
 
 mode：
 

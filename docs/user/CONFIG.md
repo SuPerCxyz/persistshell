@@ -93,6 +93,11 @@ enable_input_recording = false
 [ssh]
 auto_hook = true
 bypass_env = "PERSIST_DISABLE"
+
+[recovery.environment]
+include = []
+max_variables = 128
+max_bytes = "64KiB"
 ```
 
 ---
@@ -192,6 +197,31 @@ socket_dir = "/run/user/%UID%/persistshell"
 ```text
 <socket_dir>/persist.sock
 ```
+
+---
+
+## recovery.environment
+
+M55 使用该配置限制 Closed Session 动态环境恢复。正常退出时，隐藏 helper 采集允许的已导出
+变量和精确 unset；Holder 在 daemon 离线期间保留快照，metadata 成功后才回收退出上下文。
+再次 attach 会按当前策略过滤快照并启动新的 Shell runtime。
+
+默认只允许 `LANG` 和 `LC_*`。`include` 可增加精确变量名或仅尾部 `*` 的前缀：
+
+```toml
+[recovery.environment]
+include = ["EDITOR", "MY_PROJECT_*"]
+max_variables = 32
+max_bytes = "16KiB"
+```
+
+`max_variables` 必须在 1 到 128 之间，`max_bytes` 必须在 1 byte 到 64 KiB 之间；用户只能
+收紧硬上限。身份、基础路径、当前连接、`XDG_*`、`PERSIST_*` 和名称匹配敏感标记的规则
+始终拒绝，include 不能覆盖。用户显式 include 自定义变量即授权持久化其值，不应 include
+可能承载凭据的变量。
+
+当前连接的 `TERM`、SSH、display 和有效 agent socket 只用于本次 attach，不写入环境快照。
+未导出 Shell 变量无法恢复。旧 Holder 不支持环境 capability 时保留 cwd-only 降级。
 
 ---
 

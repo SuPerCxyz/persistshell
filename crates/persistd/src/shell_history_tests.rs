@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use persist_pty::{PtyEngine, PtySession};
 
-use crate::shell_history::prepare;
+use crate::shell_history::ShellLaunch;
 
 #[test]
 fn unsupported_shell_does_not_install_hook() {
@@ -25,9 +25,61 @@ fn bash_hook_is_private_and_composes_prompt_command() {
     let content = fs::read_to_string(rcfile).unwrap();
     assert!(content.contains("source \"$HOME/.bashrc\""));
     assert!(content.contains("PROMPT_COMMAND+=(__persist_history_capture)"));
+    assert!(content.contains("PROMPT_COMMAND+=(__persist_state_commit)"));
+    assert!(content.contains("trap '__persist_state_exit' EXIT"));
+    assert!(launch
+        .environment
+        .iter()
+        .any(|(key, value)| key == "PERSIST_STATE_SESSION_ID" && value == "8"));
+    assert!(launch
+        .environment
+        .iter()
+        .any(|(key, value)| key == "PERSIST_STATE_HELPER" && value == &helper.to_string_lossy()));
+    assert!(launch
+        .environment
+        .iter()
+        .any(|(key, value)| key == "PERSIST_STATE_ENV_MAX_VARIABLES" && value == "128"));
     assert_eq!(
         fs::metadata(rcfile).unwrap().permissions().mode() & 0o777,
         0o600
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn shell_launch_carries_validated_environment_policy_hint() {
+    let root = temp_root("environment-policy");
+    let helper = create_helper(&root);
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+    let identity = persist_core::shell_state::create_identity(&root, 9).unwrap();
+    let config = persist_core::RecoveryEnvironmentConfig {
+        include: vec!["EDITOR".into(), "MY_PROJECT_*".into()],
+        max_variables: 32,
+        max_bytes: persist_core::ByteSize::from_bytes(16 * 1024),
+    };
+    let launch = crate::shell_history::prepare_with_policy(
+        "/bin/bash",
+        9,
+        &root,
+        &helper,
+        &identity,
+        &config,
+    )
+    .unwrap()
+    .unwrap();
+    let values = launch
+        .environment
+        .into_iter()
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let policy =
+        persist_core::shell_state::EnvironmentPolicy::new(&config.include, 32, 16 * 1024).unwrap();
+
+    assert_eq!(values["PERSIST_STATE_ENV_INCLUDE"], "EDITOR,MY_PROJECT_*");
+    assert_eq!(values["PERSIST_STATE_ENV_MAX_VARIABLES"], "32");
+    assert_eq!(values["PERSIST_STATE_ENV_MAX_BYTES"], "16384");
+    assert_eq!(
+        values["PERSIST_STATE_ENV_POLICY_FINGERPRINT"],
+        policy.fingerprint()
     );
     let _ = fs::remove_dir_all(root);
 }
@@ -40,6 +92,8 @@ fn fish_hook_checks_native_history_before_writing() {
         .unwrap()
         .unwrap();
     assert!(launch.arguments[1].contains("not functions -q fish_should_add_to_history"));
+    assert!(launch.arguments[1].contains("--on-event fish_postexec"));
+    assert!(launch.arguments[1].contains("--on-event fish_exit"));
     assert_eq!(
         fs::read_to_string(root.join(".hooks/3/status")).unwrap(),
         "enabled\n"
@@ -58,6 +112,56 @@ fn bash_preserves_user_config_hook_and_history_filter() {
     )
     .unwrap();
     assert_shell_behavior("/bin/bash", "bash", &root, &home);
+}
+
+#[test]
+fn bash_preserves_existing_exit_trap_and_ignores_subshell_cwd() {
+    let root = temp_root("bash-exit");
+    let home = root.join("home");
+    fs::create_dir_all(&home).unwrap();
+    fs::write(
+        home.join(".bashrc"),
+        "trap 'printf preserved >\"$PERSIST_EXIT_MARKER\"' EXIT\n",
+    )
+    .unwrap();
+    let helper = create_helper(&root);
+    let launch = prepare("/bin/bash", 19, &root, &helper).unwrap().unwrap();
+    let state_capture = root.join("state-capture");
+    let exit_marker = root.join("exit-marker");
+    let trap_definition = root.join("trap-definition");
+    let mut command = std::process::Command::new("/bin/bash");
+    command
+        .args(&launch.arguments)
+        .arg("-c")
+        .arg(format!(
+            "__persist_state_commit; (cd /tmp; __persist_state_commit); \
+             cd /; __persist_state_commit; trap -p EXIT >{}; exit 23",
+            trap_definition.to_string_lossy()
+        ))
+        .env_clear();
+    for (key, value) in launch.environment {
+        command.env(key, value);
+    }
+    let status = command
+        .env("HOME", &home)
+        .env("PATH", std::env::var("PATH").unwrap_or_default())
+        .env("PERSIST_STATE_CAPTURE", &state_capture)
+        .env("PERSIST_EXIT_MARKER", &exit_marker)
+        .status()
+        .unwrap();
+
+    assert_eq!(status.code(), Some(23));
+    assert_eq!(fs::read_to_string(exit_marker).unwrap(), "preserved");
+    let definition = fs::read_to_string(trap_definition).unwrap();
+    assert!(definition.contains("printf preserved"));
+    assert_eq!(
+        fs::read_to_string(root.join(".hooks/19/state-status")).unwrap(),
+        "exit-conflict\n"
+    );
+    let states = fs::read_to_string(state_capture).unwrap();
+    assert!(states.contains("/\u{1e}"));
+    assert!(!states.contains("/tmp\u{1e}"));
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -288,9 +392,28 @@ fn create_helper(root: &Path) -> PathBuf {
     let helper = root.join("persist");
     fs::write(
         &helper,
-        b"#!/bin/sh\ncat >>\"$PERSIST_CAPTURE\"\nprintf '\\036' >>\"$PERSIST_CAPTURE\"\n",
+        b"#!/bin/sh\nif [ \"$1\" = __history-append ]; then\n\
+          cat >>\"$PERSIST_CAPTURE\"\n\
+          printf '\\036' >>\"$PERSIST_CAPTURE\"\n\
+          elif [ -n \"$PERSIST_STATE_CAPTURE\" ]; then\n\
+          cat >>\"$PERSIST_STATE_CAPTURE\"\n\
+          printf '\\036' >>\"$PERSIST_STATE_CAPTURE\"\n\
+          else\n\
+          cat >/dev/null\n\
+          fi\n",
     )
     .unwrap();
     fs::set_permissions(&helper, fs::Permissions::from_mode(0o700)).unwrap();
     helper
+}
+
+fn prepare(
+    shell: &str,
+    session_id: u32,
+    history_dir: &Path,
+    helper: &Path,
+) -> persist_core::Result<Option<ShellLaunch>> {
+    fs::set_permissions(history_dir, fs::Permissions::from_mode(0o700)).unwrap();
+    let identity = persist_core::shell_state::create_identity(history_dir, session_id)?;
+    crate::shell_history::prepare(shell, session_id, history_dir, helper, &identity)
 }

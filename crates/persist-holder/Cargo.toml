@@ -1,0 +1,26 @@
+[package]
+name = "persist-holder"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+license-file.workspace = true
+publish = false
+
+[lib]
+name = "persist_holder"
+path = "src/lib.rs"
+
+[[bin]]
+name = "persist-holder"
+path = "src/main.rs"
+
+[dependencies]
+persist-core = { path = "../persist-core" }
+persist-ipc = { path = "../persist-ipc" }
+persist-pty = { path = "../persist-pty" }
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

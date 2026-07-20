@@ -17,6 +17,10 @@ fn derives_xdg_paths_from_home() {
         paths.socket_path,
         PathBuf::from("/tmp/runtime/persistshell/persist.sock")
     );
+    assert_eq!(
+        paths.holder_socket_path,
+        PathBuf::from("/tmp/runtime/persistshell/holder.sock")
+    );
 }
 
 #[test]
@@ -34,6 +38,62 @@ fn default_config_has_safe_values() {
     assert!(!config.security.allow_root_attach_others);
     assert!(!config.security.enable_input_recording);
     assert_eq!(config.ssh.bypass_env, "PERSIST_DISABLE");
+    assert!(config.recovery.environment.include.is_empty());
+    assert_eq!(config.recovery.environment.max_variables, 128);
+    assert_eq!(config.recovery.environment.max_bytes.to_string(), "64KB");
+}
+
+#[test]
+fn recovery_environment_config_loads_safe_limits_and_include_rules() {
+    let dir = TestDir::new("recovery-environment");
+    let user_config = dir.path.join("user.toml");
+    fs::write(
+        &user_config,
+        r#"
+[recovery.environment]
+include = ["EDITOR", "MY_PROJECT_*"]
+max_variables = 32
+max_bytes = "16KiB"
+"#,
+    )
+    .expect("write user config");
+
+    let options = ConfigLoadOptions::from_paths(
+        test_paths("/tmp/runtime"),
+        dir.path.join("missing-system.toml"),
+        user_config,
+    );
+    let config = load_config(&options).expect("load config");
+
+    assert_eq!(
+        config.recovery.environment.include,
+        ["EDITOR", "MY_PROJECT_*"]
+    );
+    assert_eq!(config.recovery.environment.max_variables, 32);
+    assert_eq!(config.recovery.environment.max_bytes.to_string(), "16KB");
+}
+
+#[test]
+fn recovery_environment_config_rejects_unsafe_rules_and_expanded_limits() {
+    for (name, body) in [
+        ("secret", "include = [\"API_TOKEN\"]"),
+        ("glob", "include = [\"MY_*_TOKEN\"]"),
+        ("variables", "max_variables = 129"),
+        ("exact-count", "include = [\"EDITOR\"]\nmax_variables = 1"),
+        ("bytes", "max_bytes = \"65KiB\""),
+    ] {
+        let dir = TestDir::new(name);
+        let user_config = dir.path.join("user.toml");
+        fs::write(&user_config, format!("[recovery.environment]\n{body}\n"))
+            .expect("write user config");
+        let options = ConfigLoadOptions::from_paths(
+            test_paths("/tmp/runtime"),
+            dir.path.join("missing-system.toml"),
+            user_config,
+        );
+
+        assert!(load_config(&options).is_err(), "rule {name} must fail");
+    }
 }
 
 #[test]
@@ -91,6 +151,10 @@ max_file_size = "10MB"
     assert_eq!(
         config.paths.socket_path,
         PathBuf::from("/run/user/1234/custom/persist.sock")
+    );
+    assert_eq!(
+        config.paths.holder_socket_path,
+        PathBuf::from("/run/user/1234/custom/holder.sock")
     );
     assert_eq!(config.internal_log.level.to_string(), "debug");
     assert_eq!(

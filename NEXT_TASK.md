@@ -16,56 +16,42 @@ Phase 4：发布和长期维护
 
 ## 当前里程碑
 
-待维护者确定。
+M56：时间化日志与完整 Replay。
 
 ---
 
 ## 当前唯一任务
 
-确认 M52 之后的下一里程碑范围和优先级，不开始未确认的新功能实现。
+设计 M56：时间化日志、replay `--speed` 和事件驱动 `--follow`。
 
 ### 前置已完成
 
-- M51 的完整用户手册、交互式 Session 选择和实时命令历史已完成。
-- Ubuntu 26.04 tar/deb 与 Rocky Linux 9.7 RPM 已验证携带完整用户手册。
-- Rocky test 主机已验证列表选择、菜单 attach、退出后返回和最新优先历史。
-- M52 中文设计规范已确认，`ADR-0004` 已接受。
-- 实施计划已拆分为 IPC、内存模型、procfs、存储、worker、daemon、TUI 和验证阶段。
-- 阶段 1 Dashboard IPC 已完成，新增受限 summary/trend 编解码和协议文档。
-- 阶段 2 有界内存模型已完成，包含速率、聚合、64 MiB/1 小时/720 帧硬上限。
-- 阶段 3 单次 procfs 聚合已完成，包含多 Session 归属、失败状态和受限真实 source。
-- 阶段 4 版本化小时分段存储已完成，包含 CRC、尾部修复、安全权限和 24 小时/128 MiB
-  轮转。
-- 阶段 5 worker 与 daemon 生命周期已完成，包含容量 1/2 队列、5 秒触发、2 秒截止、分钟
-  writer、启动恢复、故障隔离和有界 shutdown。
-- 阶段 6 daemon Dashboard IPC 已完成，包含稳定 summary 分页、15m/1h 内存趋势、24h 分段
-  趋势、writer 串行查询、Unavailable 降级和真实 socket 集成测试。
-- 阶段 7 CLI 数据客户端已完成，包含 `persist top` TTY 门禁、summary 全分页、趋势校验、
-  request ID 校验、5 秒刷新/有界退避策略及兼容 MSRV 的 Ratatui/Crossterm 锁定依赖。
-- 阶段 8 Ratatui 全屏界面已完成，包含 daemon 摘要、Session 稳定排序、详情趋势、紧凑终端
-  降级、5 秒刷新、4 Hz 重绘上限、有界重连和 RAII 终端恢复。
-- 阶段 9 性能、文档与发布验证已完成，包含 100/1000 Session 基准、全 workspace 门禁、
-  Ubuntu tar/deb、RHEL 9 tar/RPM 和 Rocky test 主机端到端审计。
+- M55 Closed Session 动态环境恢复已完成。
+- M55 功能、安全、性能、Ubuntu 包、Rocky RPM 和远程验证审计已完成。
+- 当前 replay 支持完整输出、`--head` 和 `--tail`，但日志没有时间事件。
 
 ---
 
 ## 任务范围
 
-- 审查 `TODO.md` 中仍未完成的条目，区分真实缺口、历史状态未同步和明确暂缓项。
-- 由维护者确认下一里程碑的用户价值、边界、风险和验收标准。
-- 确认后先更新设计、`MILESTONES.md`、`TODO.md` 和本文件，再开始代码实现。
+- 只进行 M56 需求澄清、方案比较、架构设计和 ADR/设计文档。
+- 定义兼容旧日志的时间化格式、轮转边界和损坏恢复。
+- 定义 `--speed` 的时间缩放、暂停/信号和非交互语义。
+- 定义基于 inotify/事件源的 `--follow`，禁止 sleep polling。
+- 定义日志容量、安全、性能、升级和测试矩阵。
 
 ---
 
 ## 完成标准
 
-1. 下一里程碑由维护者明确确认。
-2. 唯一任务、范围、禁止事项和完成标准写入本文件。
-3. 相关里程碑、TODO 和设计文档状态一致。
+1. 现有 replay、日志 writer、轮转和打包边界完成代码审计。
+2. 至少比较两种兼容日志格式和 follow 事件模型。
+3. 中文设计规范与 ADR 通过维护者确认。
+4. 未经确认不写 M56 实现代码。
 
 ---
 
 ## 禁止事项
 
-在维护者确认下一里程碑前不得开始新功能，不得把历史 TODO 直接视为当前需求。不得创建
-release、tag 或远端 push。
+当前只设计 M56，不实现日志格式、`--speed` 或 `--follow`，
+不修改 CI、发布配置或 metadata schema。

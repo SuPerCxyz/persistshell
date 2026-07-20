@@ -18,9 +18,11 @@ SSH Disconnect != Shell Exit
 - 用户执行 persist kill
 - Shell 进程自然退出
 - Daemon 根据明确策略 GC 已关闭 Session
-- 系统重启或 Daemon 崩溃导致不可恢复
+- 系统重启或 Holder 崩溃导致不可恢复
 
-其中 `exit` 和 `Ctrl+D` 不应让 Shell 在后台继续运行。它们应释放 PTY 和 shell 进程，但保留可恢复的 Session 记录、输出、cwd 和环境变量快照。
+其中 `exit` 和 `Ctrl+D` 不应让 Shell 在后台继续运行。它们应释放 PTY 和 shell 进程，但保留
+可恢复的 Session 记录、输出、最终 cwd 和受限动态环境快照。正常退出时 M55 side channel
+采集允许的已导出变量和精确 unset；失败时回退上一可信环境。
 
 ---
 
@@ -63,23 +65,19 @@ Daemon validates request
     ↓
 Session Manager allocates SessionID
     ↓
-PTY Engine openpty()
+Daemon creates runtime identity and private state path
     ↓
-Daemon fork()
+Daemon requests Holder Create
     ↓
-Child setsid()
+Holder PTY Engine openpty()
     ↓
-Child TIOCSCTTY
+Holder forks; child setsid() and TIOCSCTTY
     ↓
 Child exec user shell
     ↓
-Parent stores PTY master
+Holder owns PTY master, replay buffer and log writer
     ↓
 Metadata created
-    ↓
-Ring Buffer created
-    ↓
-Logger initialized
     ↓
 Session status = Running
     ↓
@@ -97,11 +95,11 @@ Daemon checks ownership
     ↓
 Daemon checks session status
     ↓
-Daemon registers client
+Daemon authenticates client and requests Holder attach
     ↓
 Client enters raw mode
     ↓
-Daemon replays ring buffer
+Holder replays bounded ring buffer
     ↓
 Live IO forwarding starts
 ```
@@ -148,41 +146,46 @@ exit
 或者在 shell 空行按 `Ctrl+D`，或 shell 自然退出：
 
 ```text
+Shell hook atomically commits cwd and runtime identity
+    ↓
 Shell exits
     ↓
-Daemon receives SIGCHLD
+Holder drains PTY, reaps Shell and reads the private state file
     ↓
-PTY reaches EOF
+Holder retains exit code, optional final cwd and validated environment snapshot
     ↓
-Session Manager records exit code
+Holder emits SessionExited when daemon is connected
     ↓
-Session Manager stores last cwd and env snapshot
+Daemon calls GetExitContext for online/offline reconciliation
     ↓
-PTY is closed
+Daemon commits exit code, final cwd and accepted environment to metadata
     ↓
-Shell process resources are released
+Daemon calls RetireExited only after metadata succeeds
     ↓
-Session status = Closed
+Holder releases the retained runtime and state file
     ↓
-Ring Buffer retained
-    ↓
-Log retained
-    ↓
-Metadata updated
+Session status = Closed; log and metadata retained
     ↓
 Session waits for retention/GC
 ```
+
+状态文件使用每次 runtime 唯一的 identity 和单调 sequence。读取失败、身份不匹配、文件损坏、
+非 UTF-8 cwd 或 hook 降级时，不阻塞 Shell 退出；daemon 使用退出前最后一次 `/proc`/metadata
+cwd 和上一可信环境作为回退。Holder 在 daemon 离线时仍保留退出上下文，重启对账可重复执行
+上述 metadata-first 流程。旧 Holder 的 minor 1 上下文不包含环境，daemon 必须按兼容回退处理。
 
 Closed Session 可以再次 attach。再次 attach 时：
 
 ```text
 Client requests Attach(closed_session)
     ↓
-Daemon validates ownership and retention
+Client sends validated current terminal/SSH/display context
+    ↓
+Daemon validates ownership, retention and connection context
     ↓
 Daemon opens a new PTY
     ↓
-Daemon starts user shell with saved cwd and env snapshot
+Holder starts user shell with saved cwd and allowed startup env snapshot
     ↓
 Daemon replays retained output context
     ↓
@@ -190,6 +193,9 @@ Live IO forwarding starts
 ```
 
 这不是恢复旧进程，而是恢复旧 Shell 会话的上下文和历史。
+
+当前连接上下文只在该次 Closed restore 调用期间存在。Running Session attach 不修改其
+现有环境，connection context 也不写 metadata、最终状态 side channel 或日志。
 
 ---
 
@@ -249,6 +255,8 @@ Open metadata store
     ↓
 Recover metadata
     ↓
+Start/connect Holder and reconcile stable inventory
+    ↓
 Create Unix socket
     ↓
 Start event loop
@@ -278,20 +286,28 @@ If running sessions exist:
 
 Daemon 崩溃是严重事件。
 
-Phase 1 不承诺 daemon 崩溃后恢复 PTY fd。
-
-原因：
-
-PTY master fd 由 daemon 持有，daemon 崩溃后 fd 关闭，Shell 可能收到 SIGHUP 或因为 PTY 关闭而结束。
-
-文档必须诚实说明：
+当前 PTY 所有权已迁移到单一 per-user holder；metadata 对账由 M53 阶段 6 完成：
 
 ```text
-Phase 1 目标是 SSH 断开不丢 Session；
-不是 daemon 崩溃不丢 Session。
+Daemon crash
+    ↓
+Holder detects control disconnect
+    ↓
+Holder keeps draining PTY and retaining bounded state
+    ↓
+New daemon authenticates and reads inventory
+    ↓
+Stable snapshot and idempotent metadata reconciliation
+    ↓
+Client can attach again
 ```
 
-后续版本可以研究更复杂的 fd 继承、supervisor 或 helper 进程模型。
+对账完成并清退离线期间已退出的 Holder 项后才绑定 public socket。活动 metadata 缺少 runtime 时
+标记为 `lost`；缺少 metadata 的 Holder runtime 作为 orphan 隔离并拒绝 attach。相同对账可在
+daemon 再次崩溃后重复执行。
+
+显式 `persist daemon stop` 使用认证的 `ShutdownAll` 级联关闭；异常断开和 `SIGKILL` 不发送该
+消息。holder 自身崩溃后的恢复不属于 M53 承诺。
 
 ---
 

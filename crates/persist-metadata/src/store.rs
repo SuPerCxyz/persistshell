@@ -19,6 +19,8 @@ pub struct SessionRecord {
     pub pinned: bool,
     pub locked: bool,
     pub env_snapshot: Option<String>,
+    pub holder_instance: Option<String>,
+    pub holder_generation: Option<i64>,
 }
 
 pub struct MetadataStore {
@@ -169,6 +171,21 @@ impl MetadataStore {
                 })?;
         }
 
+        if version < 7 {
+            self.conn
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                     ALTER TABLE sessions ADD COLUMN holder_instance TEXT;
+                     ALTER TABLE sessions ADD COLUMN holder_generation INTEGER;
+                     INSERT INTO schema_version (version) VALUES (7);
+                     COMMIT;",
+                )
+                .map_err(|source| PersistError::MetadataOperation {
+                    operation: "migrate to schema version 7 (add holder reconciliation fields)",
+                    message: source.to_string(),
+                })?;
+        }
+
         Ok(())
     }
 
@@ -217,7 +234,8 @@ impl MetadataStore {
             .conn
             .prepare(
                 "SELECT session_id, name, status, created_at, updated_at,
-                        closed_at, cwd, shell, exit_code, note, pinned, locked, env_snapshot
+                        closed_at, cwd, shell, exit_code, note, pinned, locked, env_snapshot,
+                        holder_instance, holder_generation
                  FROM sessions WHERE session_id = ?1",
             )
             .map_err(|source| PersistError::MetadataOperation {
@@ -291,6 +309,14 @@ impl MetadataStore {
                     operation: "read env_snapshot",
                     source: std::io::Error::other(e.to_string()),
                 })?,
+                holder_instance: row.get(13).map_err(|e| PersistError::Io {
+                    operation: "read holder_instance",
+                    source: std::io::Error::other(e.to_string()),
+                })?,
+                holder_generation: row.get(14).map_err(|e| PersistError::Io {
+                    operation: "read holder_generation",
+                    source: std::io::Error::other(e.to_string()),
+                })?,
             })),
             None => Ok(None),
         }
@@ -305,6 +331,107 @@ impl MetadataStore {
             )
             .map_err(|source| PersistError::MetadataOperation {
                 operation: "update session status",
+                message: source.to_string(),
+            })?;
+        Ok(())
+    }
+
+    pub fn reconcile_running(
+        &mut self,
+        session_id: u32,
+        holder_instance: &str,
+        holder_generation: u64,
+    ) -> Result<()> {
+        validate_holder_state(holder_instance, holder_generation)?;
+        let holder_generation = holder_generation as i64;
+        let now = iso_now();
+        let affected = self
+            .conn
+            .execute(
+                "UPDATE sessions SET status = 'running', closed_at = NULL, exit_code = NULL,
+                        holder_instance = ?1, holder_generation = ?2, updated_at = ?3
+                 WHERE session_id = ?4",
+                rusqlite::params![holder_instance, holder_generation, now, session_id],
+            )
+            .map_err(|source| PersistError::MetadataOperation {
+                operation: "reconcile running holder session",
+                message: source.to_string(),
+            })?;
+        require_session_updated(affected)
+    }
+
+    pub fn reconcile_exited(
+        &mut self,
+        session_id: u32,
+        exit_code: i32,
+        cwd: Option<&str>,
+        holder_instance: &str,
+        holder_generation: u64,
+    ) -> Result<()> {
+        self.reconcile_exited_with_context(
+            session_id,
+            exit_code,
+            cwd,
+            None,
+            holder_instance,
+            holder_generation,
+        )
+    }
+
+    pub fn reconcile_exited_with_context(
+        &mut self,
+        session_id: u32,
+        exit_code: i32,
+        cwd: Option<&str>,
+        env_snapshot: Option<&str>,
+        holder_instance: &str,
+        holder_generation: u64,
+    ) -> Result<()> {
+        validate_holder_state(holder_instance, holder_generation)?;
+        let holder_generation = holder_generation as i64;
+        let now = iso_now();
+        let affected = self
+            .conn
+            .execute(
+                "UPDATE sessions SET status = 'closed', closed_at = COALESCE(closed_at, ?1),
+                        exit_code = ?2, cwd = COALESCE(?3, cwd),
+                        env_snapshot = COALESCE(?4, env_snapshot), holder_instance = ?5,
+                        holder_generation = ?6, updated_at = ?1 WHERE session_id = ?7",
+                rusqlite::params![
+                    now,
+                    exit_code,
+                    cwd,
+                    env_snapshot,
+                    holder_instance,
+                    holder_generation,
+                    session_id
+                ],
+            )
+            .map_err(|source| PersistError::MetadataOperation {
+                operation: "reconcile exited holder session",
+                message: source.to_string(),
+            })?;
+        require_session_updated(affected)
+    }
+
+    pub fn mark_lost(
+        &mut self,
+        session_id: u32,
+        holder_instance: &str,
+        holder_generation: u64,
+    ) -> Result<()> {
+        validate_holder_state(holder_instance, holder_generation)?;
+        let holder_generation = holder_generation as i64;
+        let now = iso_now();
+        self.conn
+            .execute(
+                "UPDATE sessions SET status = 'lost', holder_instance = ?1,
+                        holder_generation = ?2, updated_at = ?3
+                 WHERE session_id = ?4 AND status IN ('running', 'attached', 'detached')",
+                rusqlite::params![holder_instance, holder_generation, now, session_id],
+            )
+            .map_err(|source| PersistError::MetadataOperation {
+                operation: "mark missing holder session lost",
                 message: source.to_string(),
             })?;
         Ok(())
@@ -372,7 +499,8 @@ impl MetadataStore {
             .conn
             .prepare(
                 "SELECT session_id, name, status, created_at, updated_at,
-                        closed_at, cwd, shell, exit_code, note, pinned, locked, env_snapshot
+                        closed_at, cwd, shell, exit_code, note, pinned, locked, env_snapshot,
+                        holder_instance, holder_generation
                  FROM sessions ORDER BY session_id",
             )
             .map_err(|source| PersistError::MetadataOperation {
@@ -396,6 +524,8 @@ impl MetadataStore {
                     pinned: row.get(10)?,
                     locked: row.get(11)?,
                     env_snapshot: row.get(12)?,
+                    holder_instance: row.get(13)?,
+                    holder_generation: row.get(14)?,
                 })
             })
             .map_err(|source| PersistError::MetadataOperation {
@@ -596,7 +726,8 @@ impl MetadataStore {
             .conn
             .prepare(
                 "SELECT session_id, name, status, created_at, updated_at,
-                        closed_at, cwd, shell, exit_code, note, pinned, locked, env_snapshot
+                        closed_at, cwd, shell, exit_code, note, pinned, locked, env_snapshot,
+                        holder_instance, holder_generation
                  FROM sessions WHERE status = ?1 ORDER BY session_id",
             )
             .map_err(|source| PersistError::MetadataOperation {
@@ -620,6 +751,8 @@ impl MetadataStore {
                     pinned: row.get(10)?,
                     locked: row.get(11)?,
                     env_snapshot: row.get(12)?,
+                    holder_instance: row.get(13)?,
+                    holder_generation: row.get(14)?,
                 })
             })
             .map_err(|source| PersistError::MetadataOperation {
@@ -636,6 +769,27 @@ impl MetadataStore {
         }
         Ok(sessions)
     }
+}
+
+fn validate_holder_state(instance: &str, generation: u64) -> Result<()> {
+    if instance.len() != 32 || !instance.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(PersistError::invalid_argument(
+            "holder instance must be 16-byte hexadecimal",
+        ));
+    }
+    if generation > i64::MAX as u64 {
+        return Err(PersistError::invalid_argument(
+            "holder generation exceeds metadata integer range",
+        ));
+    }
+    Ok(())
+}
+
+fn require_session_updated(affected: usize) -> Result<()> {
+    if affected == 0 {
+        return Err(PersistError::invalid_argument("session not found"));
+    }
+    Ok(())
 }
 
 fn iso_now() -> String {
@@ -741,6 +895,54 @@ mod tests {
     }
 
     #[test]
+    fn version_six_database_migrates_holder_fields() {
+        let dir = std::env::temp_dir().join(format!(
+            "persist-metadata-v6-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("metadata.db");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE schema_version (version INTEGER NOT NULL);
+             INSERT INTO schema_version (version) VALUES (6);
+             CREATE TABLE sessions (
+                 session_id INTEGER PRIMARY KEY, name TEXT NOT NULL,
+                 status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+                 closed_at TEXT, cwd TEXT, shell TEXT, exit_code INTEGER, note TEXT,
+                 pinned INTEGER NOT NULL DEFAULT 0, locked INTEGER NOT NULL DEFAULT 0,
+                 env_snapshot TEXT
+             );
+             CREATE TABLE session_tags (
+                 session_id INTEGER NOT NULL, tag TEXT NOT NULL,
+                 PRIMARY KEY (session_id, tag)
+             );
+             INSERT INTO sessions
+                 (session_id, name, status, created_at, updated_at, pinned, locked)
+             VALUES (1, 'old', 'running', 'now', 'now', 0, 0);",
+        )
+        .unwrap();
+        drop(conn);
+
+        let mut store = MetadataStore::open(&path).expect("migrate v6 database");
+        let old = store.get_session(1).unwrap().unwrap();
+        assert!(old.holder_instance.is_none());
+        store
+            .reconcile_running(1, "00112233445566778899aabbccddeeff", 3)
+            .unwrap();
+        assert_eq!(
+            store.get_session(1).unwrap().unwrap().holder_generation,
+            Some(3)
+        );
+        drop(store);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn create_and_get_session() {
         let mut store = MetadataStore::open_in_memory().expect("open in-memory");
 
@@ -759,6 +961,8 @@ mod tests {
         assert_eq!(session.shell.as_deref(), Some("/bin/bash"));
         assert!(session.closed_at.is_none());
         assert!(session.exit_code.is_none());
+        assert!(session.holder_instance.is_none());
+        assert!(session.holder_generation.is_none());
     }
 
     #[test]
@@ -812,6 +1016,66 @@ mod tests {
         assert_eq!(reopened.status, "running");
         assert!(reopened.closed_at.is_none());
         assert!(reopened.exit_code.is_none());
+    }
+
+    #[test]
+    fn holder_reconciliation_is_idempotent() {
+        const INSTANCE: &str = "00112233445566778899aabbccddeeff";
+        let mut store = MetadataStore::open_in_memory().expect("open in-memory");
+        store.create_session(1, "s1", None, None).expect("create");
+        store
+            .close_session_with_context(1, 0, Some("/old"), Some(r#"{"LANG":"C"}"#))
+            .expect("seed recovery context");
+        store.reopen_session(1).expect("reopen");
+
+        store
+            .reconcile_running(1, INSTANCE, 7)
+            .expect("reconcile running");
+        store
+            .reconcile_running(1, INSTANCE, 7)
+            .expect("repeat running");
+        let running = store.get_session(1).unwrap().unwrap();
+        assert_eq!(running.status, "running");
+        assert_eq!(running.holder_instance.as_deref(), Some(INSTANCE));
+        assert_eq!(running.holder_generation, Some(7));
+
+        store
+            .reconcile_exited(1, 23, Some("/srv/final"), INSTANCE, 8)
+            .expect("reconcile exited");
+        store
+            .reconcile_exited(1, 23, None, INSTANCE, 8)
+            .expect("repeat exited");
+        let closed = store.get_session(1).unwrap().unwrap();
+        assert_eq!(closed.status, "closed");
+        assert_eq!(closed.exit_code, Some(23));
+        assert_eq!(closed.cwd.as_deref(), Some("/srv/final"));
+        assert_eq!(closed.env_snapshot.as_deref(), Some(r#"{"LANG":"C"}"#));
+        assert_eq!(closed.holder_generation, Some(8));
+    }
+
+    #[test]
+    fn mark_lost_only_changes_active_metadata() {
+        const INSTANCE: &str = "ffeeddccbbaa99887766554433221100";
+        let mut store = MetadataStore::open_in_memory().expect("open in-memory");
+        store.create_session(1, "s1", None, None).expect("create");
+        store.mark_lost(1, INSTANCE, 9).expect("mark lost");
+        store.mark_lost(1, INSTANCE, 9).expect("repeat lost");
+        assert_eq!(store.get_session(1).unwrap().unwrap().status, "lost");
+
+        store.create_session(2, "s2", None, None).expect("create");
+        store.close_session(2, 0).expect("close");
+        store.mark_lost(2, INSTANCE, 9).expect("ignore closed");
+        assert_eq!(store.get_session(2).unwrap().unwrap().status, "closed");
+    }
+
+    #[test]
+    fn holder_reconciliation_rejects_invalid_identity() {
+        let mut store = MetadataStore::open_in_memory().expect("open in-memory");
+        store.create_session(1, "s1", None, None).expect("create");
+        assert!(store.reconcile_running(1, "not-hex", 1).is_err());
+        assert!(store
+            .reconcile_running(1, "00112233445566778899aabbccddeeff", u64::MAX)
+            .is_err());
     }
 
     #[test]

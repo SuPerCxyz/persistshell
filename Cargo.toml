@@ -2,6 +2,7 @@
 members = [
     "crates/persist-cli",
     "crates/persist-core",
+    "crates/persist-holder",
     "crates/persist-ipc",
     "crates/persist-metadata",
     "crates/persist-pty",

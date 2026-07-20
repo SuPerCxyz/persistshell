@@ -240,12 +240,16 @@ ERR_UNSUPPORTED
 ```text
 Client → HELLO
 Daemon → HELLO_ACK
-Client → ATTACH(session_id)
+Client → ATTACH(session_id, connection_env optional)
 Daemon → ATTACH_RESP(ok)
 Daemon → STDOUT(replay ring buffer)
 Client ↔ STDIN/RESIZE
 Daemon → STDOUT(live output)
 ```
+
+public protocol `0.2` 的 `connection_env` 仅包含固定 allowlist 的当前终端、SSH agent 和
+显示变量。旧 `0.1` daemon/client 继续使用 4-byte Session ID；同 major 的 minor 差异兼容。
+该上下文是请求级数据，不持久化，也不改变 Running Session。
 
 ---
 

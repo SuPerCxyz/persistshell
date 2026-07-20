@@ -18,24 +18,29 @@ Phase 4 维护阶段；本文件只记录仍未修复的实际限制或可用性
 状态：
 
 ```text
-已知限制
+部分解决，M53 平台和规模验证尚未完成
 ```
 
 说明：
 
-Phase 1 设计中，daemon 持有 PTY master fd。
+当前生产 runtime 已由单一 per-user `persist-holder` 持有 PTY master。真实进程测试已证明 daemon
+被 `SIGKILL` 后 Shell 继续执行和输出，第二 daemon 可以接管同一 Holder 并 attach replay。
 
-如果 daemon 崩溃，PTY fd 会关闭，Session 可能无法恢复。
+Holder inventory 与 metadata 的 `lost`、orphan、离线退出和 generation 窗口已完成幂等对账；
+create、metadata commit、Shell exit 和 reconcile 崩溃窗口已有重复重启集成测试。
+Holder 自身异常退出时 daemon 会在有界采样周期内将活动 Session 标记为 `lost` 并拒绝 attach；
+该行为防止伪称可恢复，但不能恢复已丢失的 PTY。
 
 影响：
 
 - SSH 断开可恢复。
-- Daemon 崩溃不保证恢复。
+- Daemon 崩溃后 runtime 可保活并在重启时先对账再开放 public socket。
+- Holder 自身崩溃或系统重启后，活动 PTY runtime 仍不可恢复。
 
 处理计划：
 
-- Phase 1 文档明确限制。
-- 后续研究 supervisor / pty-holder 模型。
+- M53 后续阶段完成故障注入、性能、平台和打包验证。
+- Holder 自身崩溃后的 PTY 恢复继续作为后续限制。
 
 ---
 
@@ -156,14 +161,18 @@ persistd help
 
 ---
 
-## KI-0007：快速 `cd; exit` 可能保留上一次 cwd
+## KI-0007：快速 `cd; exit` 最终 cwd 竞态
 
-状态：已知恢复精度限制。
+状态：已在 M54 解决。
 
-说明：cwd 来自 `/proc/<shell-pid>/cwd` 采样。shell 在下一次采样前退出时，进程进入 zombie
-后无法再读取最终 cwd。正常运行窗口内的 cwd 与 closed attach 恢复已通过测试。
+说明：默认 bash、zsh 和 fish 通过私有原子状态文件提交最终 cwd；Holder 在 Shell 退出后保留
+上下文，daemon 采用 metadata-first 顺序保存后再 retire。正常 `exit`、空行 `Ctrl+D`、
+快速 `cd; exit`、daemon 离线退出和两个崩溃窗口均已验证。
 
-处理计划：为受支持 Shell 设计不会解析用户命令的退出状态 side channel。
+验证证据：`docs/audit/2026-07-20-m54-final-shell-state-validation.md`。
+
+剩余的用户 hook 冲突、强制终止、非 UTF-8 cwd 等降级边界记录在
+`docs/known/LIMITATIONS.md`，不再作为本问题的未实现状态。
 
 ---
 

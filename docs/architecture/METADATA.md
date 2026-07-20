@@ -99,6 +99,24 @@ Daemon 启动时必须检查。
 
 必须有 schema version。
 
+当前实现使用 schema v7。v7 在既有 `sessions` 表增加：
+
+```text
+holder_instance    32 位小写十六进制 Holder instance ID，可为空
+holder_generation  最近一次完成对账的 Holder generation，可为空
+```
+
+旧数据库通过单向 SQLite migration 升级；重复打开不会重复迁移。`lost` 复用现有 `status` 字段，
+不增加独立布尔列。
+
+M55 不升级 schema。既有 `env_snapshot` 文本列继续使用，但读写由独立 codec 管理：
+
+- M14 JSON string map 仅用于旧数据读取，并按当前恢复策略重新过滤。
+- 新写入统一使用包含 format/policy version、fingerprint、set/unset 和 capture status 的 v2。
+- 编码固定排序且最多 64 KiB；重复键、未知字段、冲突和非法名称拒绝。
+- 在线退出、周期对账和启动对账先原子提交 exit code/cwd/environment，再 retire Holder。
+- 环境不可用或不符合当前策略时使用 `COALESCE` 保留上一可信快照，cwd 和 exit code 仍提交。
+
 例如：
 
 ```sql
@@ -238,6 +256,36 @@ update status
 ## Metadata 与 Runtime State
 
 Metadata 是持久状态。
+
+M53 后，Holder inventory 是活动 PTY runtime 的事实来源，SQLite 是长期 Session 记录的事实来源。
+daemon 必须在开放 public socket 前取得 generation 稳定的完整 Holder snapshot 并完成以下幂等
+对账：
+
+| Metadata | Holder | 结果 |
+|---|---|---|
+| active | Running，同 instance 或未绑定 | 更新为 `running` 并记录 instance/generation |
+| active | Exited，同 instance 或未绑定 | 更新为 `closed`，保存 exit code，再清退 Holder 项 |
+| active | 缺失 | 更新为 `lost` |
+| 任意记录 | 不同 Holder instance | 活动记录更新为 `lost`，runtime 按 orphan 隔离 |
+| 缺失 | 任意 runtime | 标记为 orphan，不允许 public attach |
+
+`closed` 与 `lost` 都会出现在 Session 列表中，但只有 `closed` 可以执行冷恢复。orphan 只用于当前
+daemon 的隔离集合，不会伪造 metadata 记录；新 Session ID 必须跳过 orphan 占用的 ID。
+
+运行期间 daemon 每个 Dashboard 采样周期刷新 inventory 并重复相同对账。对账 API 允许重复执行，
+相同 instance/generation 不会创建重复 Session。
+
+### 崩溃窗口
+
+Session create 和 SQLite commit 无法组成跨进程事务，因此通过恢复规则闭合窗口：
+
+- Holder create 后、metadata commit 前崩溃：runtime 成为不可 attach 的 orphan。
+- metadata commit 后崩溃：新 daemon 按同一 Holder instance 恢复为 running。
+- daemon 离线期间 Shell 退出：snapshot 恢复 closed、exit code 和 Holder 已写入的 Session 日志。
+- 对账完成后再次崩溃：下一 daemon 重复对账，结果保持一致。
+
+debug 构建的集成测试使用 `PERSIST_TEST_CRASH_POINT` 注入上述窗口；release 构建不执行该测试
+控制逻辑。
 
 Daemon 内存中还有 runtime state：
 

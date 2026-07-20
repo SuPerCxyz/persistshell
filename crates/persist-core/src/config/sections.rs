@@ -260,6 +260,50 @@ impl SshConfig {
     }
 }
 
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
+pub struct RecoveryConfig {
+    pub environment: RecoveryEnvironmentConfig,
+}
+
+impl RecoveryConfig {
+    pub(super) fn apply(&mut self, partial: PartialRecoveryConfig) {
+        if let Some(environment) = partial.environment {
+            self.environment.apply(environment);
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct RecoveryEnvironmentConfig {
+    pub include: Vec<String>,
+    pub max_variables: usize,
+    pub max_bytes: ByteSize,
+}
+
+impl Default for RecoveryEnvironmentConfig {
+    fn default() -> Self {
+        Self {
+            include: Vec::new(),
+            max_variables: 128,
+            max_bytes: ByteSize::from_bytes(64 * 1024),
+        }
+    }
+}
+
+impl RecoveryEnvironmentConfig {
+    fn apply(&mut self, partial: PartialRecoveryEnvironmentConfig) {
+        if let Some(include) = partial.include {
+            self.include = include;
+        }
+        if let Some(max_variables) = partial.max_variables {
+            self.max_variables = max_variables;
+        }
+        if let Some(max_bytes) = partial.max_bytes {
+            self.max_bytes = max_bytes;
+        }
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub(super) struct PartialConfig {
@@ -271,6 +315,7 @@ pub(super) struct PartialConfig {
     pub(super) internal_log: Option<PartialInternalLogConfig>,
     pub(super) security: Option<PartialSecurityConfig>,
     pub(super) ssh: Option<PartialSshConfig>,
+    pub(super) recovery: Option<PartialRecoveryConfig>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -338,4 +383,18 @@ pub(super) struct PartialSecurityConfig {
 pub(super) struct PartialSshConfig {
     auto_hook: Option<bool>,
     bypass_env: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub(super) struct PartialRecoveryConfig {
+    environment: Option<PartialRecoveryEnvironmentConfig>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub(super) struct PartialRecoveryEnvironmentConfig {
+    include: Option<Vec<String>>,
+    max_variables: Option<usize>,
+    max_bytes: Option<ByteSize>,
 }

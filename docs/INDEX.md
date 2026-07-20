@@ -37,6 +37,7 @@
 - `docs/protocol/SESSION_PROTOCOL.md`
 - `docs/protocol/SOCKET_PROTOCOL.md`
 - `docs/protocol/CLIENT_PROTOCOL.md`
+- `docs/protocol/HOLDER_PROTOCOL.md`
 
 ## 开发规范
 
@@ -74,11 +75,21 @@
 - `docs/audit/2026-07-15-m50-release-readiness.md`
 - `docs/audit/2026-07-15-m50-platform-package-remote-validation.md`
 - `docs/audit/2026-07-16-m52-performance-dashboard-validation.md`
+- `docs/audit/2026-07-19-m53-pty-holder-validation.md`
+- `docs/audit/2026-07-20-m54-final-shell-state-validation.md`
+- `docs/audit/2026-07-20-m55-dynamic-environment-recovery-validation.md`
 - `docs/adr/ADR-0000-template.md`
 - `docs/adr/ADR-0001-rust-primary-language.md`
 - `docs/adr/ADR-0002-closed-session-recovery-context.md`
 - `docs/adr/ADR-0003-transient-shell-history-hooks.md`
 - `docs/adr/ADR-0004-bounded-performance-dashboard.md`
+- `docs/adr/ADR-0005-per-user-pty-holder.md`
+- `docs/adr/ADR-0006-final-shell-state-side-channel.md`
+- `docs/adr/ADR-0007-safe-dynamic-environment-recovery.md`
+- `docs/superpowers/specs/2026-07-20-m54-final-shell-state-side-channel-design.md`
+- `docs/superpowers/specs/2026-07-20-m54-final-shell-state-side-channel-implementation-plan.md`
+- `docs/superpowers/specs/2026-07-20-m55-dynamic-environment-recovery-design.md`
+- `docs/superpowers/specs/2026-07-20-m55-dynamic-environment-recovery-implementation-plan.md`
 - `docs/design/LICENSING.md`
 
 ## 当前约束
@@ -86,3 +97,9 @@
 Rust runtime、PTY、daemon、IPC streaming、SSH 接管、安装器和平台发布包均已完成阶段性验证。
 M52 已完成有界 Performance dashboard、本地 100/1000 Session 性能门禁、平台包和 Rocky
 test 主机验证；GitHub Release、签名与 SBOM 仍须维护者决策。
+M53 已完成单一 per-user PTY Holder、daemon 崩溃接管、metadata 对账、固定路径平台包、
+100/500/1000 Session 基准及 Rocky test 故障注入验证。
+M54 已完成最终 cwd 私有原子状态文件、Holder 离线退出上下文、metadata-first 对账、
+Bash/Zsh/Fish 兼容、双平台包和 Rocky test 验证。
+M55 已完成安全动态环境 set/unset、当前连接优先、版本化状态、旧 Holder 降级、性能、
+双平台包和 Rocky test 验证。

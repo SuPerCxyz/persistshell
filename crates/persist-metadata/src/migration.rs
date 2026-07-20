@@ -8,3 +8,8 @@ pub const INITIAL_MIGRATION: Migration = Migration {
     version: 1,
     name: "initial metadata schema",
 };
+
+pub const HOLDER_RECONCILIATION_MIGRATION: Migration = Migration {
+    version: 7,
+    name: "add holder reconciliation fields",
+};

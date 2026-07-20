@@ -8,6 +8,17 @@
 /usr/share/doc/persistshell/USER_GUIDE.md
 ```
 
+系统包安装以下运行文件：
+
+```text
+/usr/bin/persist
+/usr/bin/persistd
+/usr/libexec/persistshell/persist-holder
+```
+
+`persist-holder` 是内部运行组件，不是用户命令。release 版 `persistd` 只从上述固定路径启动它，
+不会通过 `PATH` 或 `PERSIST_HOLDER_PATH` 选择其它程序。
+
 ---
 
 ## 安装目标
@@ -23,6 +34,29 @@ ssh node
 ---
 
 ## 安装方式
+
+Debian/Ubuntu：
+
+```bash
+sudo apt install ./persistshell_0.1.0_amd64.deb
+```
+
+RHEL/Rocky Linux 9：
+
+```bash
+sudo dnf install ./persistshell-0.1.0-1.el9.x86_64.rpm
+```
+
+tarball 解压后必须保持布局，并将内部组件安装到固定路径：
+
+```bash
+sudo install -m 0755 bin/persist bin/persistd /usr/bin/
+sudo install -d -m 0755 /usr/libexec/persistshell
+sudo install -m 0755 libexec/persistshell/persist-holder \
+  /usr/libexec/persistshell/persist-holder
+```
+
+安装二进制后，再以普通用户执行：
 
 ```bash
 persist install
@@ -150,6 +184,9 @@ persist uninstall
 - logs
 - config
 
+使用 `apt remove`、`dnf remove` 或手动删除发行包的三个运行文件时，也不得删除这些当前用户
+目录。系统包卸载与 `persist uninstall` 都默认保留 Session metadata、历史和日志。
+
 完全清理：
 
 ```bash
@@ -189,6 +226,8 @@ persist doctor
 - socket 权限是否正确
 - 数据目录是否正确
 - 配置是否有效
+- Holder 是否 connected，PID 和 instance 是否可读
+- degraded 日志与 `lost` Session 计数是否为零
 
 ---
 

@@ -526,7 +526,7 @@ pub(crate) fn connect_and_hello(config: &Config) -> Result<persist_ipc::ClientSo
     let uid = unsafe { libc::getuid() };
     let hello_payload = persist_ipc::encode_hello(&persist_ipc::HelloPayload {
         protocol_major: 0,
-        protocol_minor: 1,
+        protocol_minor: persist_ipc::ATTACH_CONTEXT_PROTOCOL_MINOR,
         uid,
         pid: std::process::id(),
     });

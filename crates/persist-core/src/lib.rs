@@ -8,6 +8,7 @@ pub mod error;
 pub mod logging;
 pub mod ringbuf;
 pub mod session;
+pub mod shell_state;
 
 pub use build::{version_info, version_string, VersionInfo};
 pub use command_history::{
@@ -16,7 +17,7 @@ pub use command_history::{
 };
 pub use config::{
     load_config, load_default_config, ByteSize, Config, ConfigLoadOptions, ConfigPaths,
-    DurationValue,
+    DurationValue, RecoveryEnvironmentConfig,
 };
 pub use error::{PersistError, Result};
 pub use logging::{

@@ -23,6 +23,10 @@ pub enum Command {
         session_id: u32,
         shell: String,
     },
+    ShellStateCommit,
+    BenchmarkAttach {
+        session_id: u32,
+    },
     ProcessTree {
         session_id: u32,
     },
@@ -117,6 +121,19 @@ pub fn parse_command(args: &[String]) -> Result<Command> {
             }
             Ok(Command::HistoryAppend { session_id, shell })
         }
+        Some("__state-commit") if args.len() == 1 => Ok(Command::ShellStateCommit),
+        Some("__state-commit") => Err(PersistError::invalid_argument(
+            "usage: persist __state-commit",
+        )),
+        Some("__benchmark-attach") if args.len() == 2 => args[1]
+            .parse()
+            .map(|session_id| Command::BenchmarkAttach { session_id })
+            .map_err(|_| {
+                PersistError::invalid_argument("usage: persist __benchmark-attach <session_id>")
+            }),
+        Some("__benchmark-attach") => Err(PersistError::invalid_argument(
+            "usage: persist __benchmark-attach <session_id>",
+        )),
         Some("ls") => parse_list_command(&args[1..]),
         Some("ps") => {
             let session_id = args
@@ -506,6 +523,15 @@ mod tests {
     }
 
     #[test]
+    fn parses_hidden_shell_state_commit() {
+        assert_eq!(
+            parse_command(&["__state-commit".to_string()]).expect("parse"),
+            Command::ShellStateCommit
+        );
+        assert!(parse_command(&["__state-commit".to_string(), "extra".to_string()]).is_err());
+    }
+
+    #[test]
     fn parses_config_show() {
         let args = vec!["config".to_string(), "show".to_string()];
         assert_eq!(parse_command(&args).expect("parse"), Command::Config);
@@ -550,6 +576,14 @@ mod tests {
                 session_id: 42,
                 shell: "bash".to_string(),
             }
+        );
+    }
+
+    #[test]
+    fn parses_hidden_benchmark_attach() {
+        assert_eq!(
+            parse_command(&["__benchmark-attach".to_string(), "42".to_string()]).expect("parse"),
+            Command::BenchmarkAttach { session_id: 42 }
         );
     }
 

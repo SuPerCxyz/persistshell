@@ -2,7 +2,7 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{Seek, Write};
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -10,6 +10,33 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use persist_core::{PersistError, Result};
 
 static SHUTDOWN: AtomicBool = AtomicBool::new(false);
+const RUNTIME_DIR_MODE: u32 = 0o700;
+
+pub fn prepare_runtime_dir(path: &Path) -> Result<()> {
+    fs::create_dir_all(path).map_err(|source| PersistError::Io {
+        operation: "create daemon runtime directory",
+        source,
+    })?;
+    let metadata = fs::symlink_metadata(path).map_err(|source| PersistError::Io {
+        operation: "inspect daemon runtime directory",
+        source,
+    })?;
+    if metadata.file_type().is_symlink()
+        || !metadata.is_dir()
+        || metadata.uid() != unsafe { libc::geteuid() }
+    {
+        return Err(PersistError::invalid_argument(format!(
+            "unsafe daemon runtime directory: {}",
+            path.display()
+        )));
+    }
+    fs::set_permissions(path, fs::Permissions::from_mode(RUNTIME_DIR_MODE)).map_err(|source| {
+        PersistError::Io {
+            operation: "set daemon runtime directory permissions",
+            source,
+        }
+    })
+}
 
 extern "C" fn handle_sigterm(_: i32) {
     SHUTDOWN.store(true, Ordering::SeqCst);
@@ -138,6 +165,7 @@ fn write_pid(file: &mut File, pid: u32) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::{symlink, PermissionsExt};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_pid_path(name: &str) -> PathBuf {
@@ -150,6 +178,33 @@ mod tests {
             std::process::id()
         ));
         dir.join("daemon.pid")
+    }
+
+    #[test]
+    fn prepare_runtime_dir_enforces_private_mode() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let runtime = temp.path().join("runtime");
+        fs::create_dir(&runtime).expect("runtime");
+        fs::set_permissions(&runtime, fs::Permissions::from_mode(0o755)).expect("broad mode");
+        prepare_runtime_dir(&runtime).expect("prepare runtime");
+        assert_eq!(
+            fs::metadata(runtime)
+                .expect("metadata")
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+    }
+
+    #[test]
+    fn prepare_runtime_dir_rejects_symlink() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let target = temp.path().join("target");
+        let runtime = temp.path().join("runtime");
+        fs::create_dir(&target).expect("target");
+        symlink(target, &runtime).expect("runtime symlink");
+        assert!(prepare_runtime_dir(&runtime).is_err());
     }
 
     #[test]

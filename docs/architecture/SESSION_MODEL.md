@@ -175,13 +175,14 @@ Closed Session 仍然保留：
 
 - Session ID
 - metadata
-- 最后 cwd
-- 环境变量快照
+- 最终 cwd（状态 side channel 成功时）或最后一个可信回退 cwd
+- 正常退出时保存的受限动态环境变量快照
 - ring buffer
 - 持久日志
 - exit code
 
-用户之后可以 attach 回这个 Session。此时 Daemon 应重新创建 PTY 和用户 shell，并用保存的 cwd、环境变量快照和输出历史恢复上下文。
+用户之后可以 attach 回这个 Session。此时 Holder 重新创建 PTY 和用户 shell，并用保存的 cwd、
+受限动态环境快照和输出历史恢复上下文。未导出或未被当前策略允许的变量不会恢复。
 
 注意：Closed 只能恢复 Shell 上下文，不能复活已经随 `exit` 结束的前台进程或普通子进程。
 
@@ -303,8 +304,8 @@ exit
 PersistShell 必须：
 
 1. 记录 exit code。
-2. 保存最后 cwd。
-3. 保存允许持久化的环境变量快照。
+2. 优先保存状态 side channel 提交的最终 cwd，失败时保留可信回退值。
+3. 保留创建 Session 时保存的允许持久化环境变量快照。
 4. 保留 ring buffer 和日志。
 5. 关闭 PTY。
 6. 释放 shell 进程和前台进程资源。
@@ -316,7 +317,8 @@ PersistShell 必须：
 persist attach <id>
 ```
 
-Daemon 应将 Closed Session 作为可恢复 Session 处理，重新创建 shell，并恢复上次保存的 cwd、环境变量和输出上下文。
+Daemon 应将 Closed Session 作为可恢复 Session 处理，由 Holder 重新创建 shell，并恢复保存的
+cwd、受限启动环境和输出上下文。
 
 这与 SSH 断开不同。
 
@@ -340,7 +342,7 @@ Daemon 应将 Closed Session 作为可恢复 Session 处理，重新创建 shell
 
 Session 当前工作目录很重要。
 
-Phase 1 可以通过 shell pid 的 procfs 尝试读取：
+运行期间 daemon 可以通过 shell pid 的 procfs 尽力采样：
 
 ```text
 /proc/<shell_pid>/cwd
@@ -348,7 +350,9 @@ Phase 1 可以通过 shell pid 的 procfs 尝试读取：
 
 前台进程运行时，也可以读取前台进程 cwd。
 
-读取失败时显示 unknown。
+受支持的 bash、zsh 和 fish 还通过私有 hook 调用隐藏 helper，以原子状态文件提交当前 cwd。
+每次 runtime 使用唯一 identity；Holder 在 Shell 退出后验证并读取该文件。该 side channel 是
+正常退出和快速 `cd; exit` 的最终 cwd 来源，procfs 和 metadata 只作为降级回退。
 
 ---
 
@@ -413,9 +417,10 @@ Session 创建时继承一组环境变量。
 
 ### Closed Session 环境快照
 
-Session 进入 Closed 状态时，PersistShell 应保存环境变量快照。
+当前版本在正常退出时保存允许的已导出变量和精确 unset。敏感禁区、身份/基础变量、
+`XDG_*`、`PERSIST_*` 与当前连接变量不进入快照；策略收紧后恢复入口会再次过滤。
 
-恢复 Closed Session 时，应使用该快照启动新的 shell，使用户看到的基础环境与上次退出前一致。
+恢复 Closed Session 时，使用该快照启动新的 shell，使允许的普通环境与上次退出前一致。
 
 如果某些变量只对当前 SSH 连接有效，例如 `SSH_AUTH_SOCK`、`DISPLAY`、`WAYLAND_DISPLAY`，恢复时必须按安全 allowlist 和当前 attach 请求重新计算，不能盲目使用旧值。
 

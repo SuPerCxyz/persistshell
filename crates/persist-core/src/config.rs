@@ -11,8 +11,8 @@ use crate::error::{PersistError, Result};
 
 use sections::PartialConfig;
 pub use sections::{
-    DaemonConfig, InternalLogConfig, LoggingConfig, RingBufferConfig, RuntimeConfig,
-    SecurityConfig, SessionConfig, SshConfig,
+    DaemonConfig, InternalLogConfig, LoggingConfig, RecoveryConfig, RecoveryEnvironmentConfig,
+    RingBufferConfig, RuntimeConfig, SecurityConfig, SessionConfig, SshConfig,
 };
 pub use values::{ByteSize, DurationValue};
 
@@ -26,6 +26,7 @@ pub struct ConfigPaths {
     pub state_dir: PathBuf,
     pub runtime_dir: PathBuf,
     pub socket_path: PathBuf,
+    pub holder_socket_path: PathBuf,
 }
 
 impl ConfigPaths {
@@ -66,6 +67,7 @@ impl ConfigPaths {
             .join("persistshell");
         let runtime_dir = runtime_base.join("persistshell");
         let socket_path = runtime_dir.join("persist.sock");
+        let holder_socket_path = runtime_dir.join("holder.sock");
 
         Self {
             config_dir,
@@ -73,12 +75,14 @@ impl ConfigPaths {
             state_dir,
             runtime_dir,
             socket_path,
+            holder_socket_path,
         }
     }
 
     fn set_runtime_dir(&mut self, runtime_dir: PathBuf) {
         self.runtime_dir = runtime_dir;
         self.socket_path = self.runtime_dir.join("persist.sock");
+        self.holder_socket_path = self.runtime_dir.join("holder.sock");
     }
 }
 
@@ -123,6 +127,7 @@ pub struct Config {
     pub internal_log: InternalLogConfig,
     pub security: SecurityConfig,
     pub ssh: SshConfig,
+    pub recovery: RecoveryConfig,
 }
 
 impl Config {
@@ -140,6 +145,7 @@ impl Config {
             internal_log,
             security: SecurityConfig::default(),
             ssh: SshConfig::default(),
+            recovery: RecoveryConfig::default(),
         }
     }
 
@@ -203,6 +209,14 @@ impl Config {
                 "security.allow_root_attach_others is not supported in Phase 1",
             ));
         }
+        crate::shell_state::EnvironmentPolicy::new(
+            &self.recovery.environment.include,
+            self.recovery.environment.max_variables,
+            usize::try_from(self.recovery.environment.max_bytes.bytes()).unwrap_or(usize::MAX),
+        )
+        .map_err(|error| {
+            PersistError::config_validation(format!("recovery.environment is invalid: {error}"))
+        })?;
 
         Ok(())
     }
@@ -232,6 +246,9 @@ impl Config {
         }
         if let Some(ssh) = partial.ssh {
             self.ssh.apply(ssh);
+        }
+        if let Some(recovery) = partial.recovery {
+            self.recovery.apply(recovery);
         }
         Ok(())
     }

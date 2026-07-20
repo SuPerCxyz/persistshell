@@ -45,19 +45,27 @@ Phase 1 使用 per-user daemon。
 
 ---
 
-### 不保证 daemon 崩溃后 Session 恢复
+### daemon 崩溃恢复尚未完成平台规模验证
 
-Phase 1 只保证：
-
-```text
-SSH 断开不导致 Session 结束。
-```
-
-不保证：
+当前已经验证：
 
 ```text
-daemon 崩溃后 Session 仍可恢复。
+daemon 被 SIGKILL 后 Holder 保持 PTY 和 Shell，第二 daemon 可接管并恢复 attach。
+新 daemon 在开放 public socket 前完成 generation 稳定快照和 metadata 幂等对账。
+离线退出、missing runtime、orphan 和重复对账均有真实进程测试覆盖。
 ```
+
+当前仍不保证：
+
+```text
+Holder 自身崩溃或系统重启后恢复活动 PTY runtime。
+```
+
+Holder 自身崩溃时 daemon 会将受影响 Session 标记为 `lost`，列表、metrics 和 doctor 均明确提示
+attach 不可用；这属于一致性降级，不是 PTY 恢复。
+
+100/1000 Session 压力、发布包升级和 test 主机验证将在 M53 后续阶段完成；完成前不扩大当前
+本地功能验证结论。
 
 ---
 
@@ -95,16 +103,21 @@ Shell 的 agent socket。
 
 ### Closed Session 环境变量范围
 
-M14 只恢复 Shell 启动时继承的受限环境快照：`TERM`、`COLORTERM`、`LANG` 与
-`LC_*`。Shell 运行期间通过 `export`、脚本或插件动态修改的环境变量不保证可恢复。
+M55 恢复 `LANG`、`LC_*` 和用户明确 include 的已导出变量，并保留精确 unset。未导出的局部
+变量、未允许名称和敏感禁区不会恢复。当前终端、SSH、display 和 agent 变量来自每次 attach，
+不会持久化。旧 Holder 没有环境 capability 时降级为 cwd-only 和旧 metadata 快照。
 
 ---
 
-### Closed Session 快速退出的 cwd 采样竞态
+### 最终 cwd side channel 的降级边界
 
-cwd 通过 `/proc/<shell-pid>/cwd` 周期采样。若 shell 在一次采样间隔内完成 `cd` 并立即退出，
-daemon 只能保留上一次成功采样的 cwd。彻底消除该竞态需要跨 bash/zsh/fish 的退出状态
-side channel，当前版本尚未实现。
+默认 bash、zsh 和 fish 已使用私有原子状态文件解决正常退出、空行 `Ctrl+D` 和快速
+`cd; exit` 的最终 cwd 采样竞态。PersistShell 以用户配置完整性为第一优先级，因此已有 Bash
+`EXIT` trap 时不替换用户 trap，只保留 prompt 提交。
+
+Shell 被 `SIGKILL`、通过 `exec` 替换、用户删除 hook、未安装 hook 的嵌套/不支持 Shell、
+非 UTF-8 cwd、状态文件损坏或身份校验失败时，最终提交不可用，系统回退到最近一次
+`/proc`/metadata cwd 和上一可信环境。此降级不会阻止 Shell 退出。
 
 ---
 

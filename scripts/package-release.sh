@@ -17,15 +17,16 @@ mkdir -p "$DIST"
 DIST=$(cd "$DIST" && pwd -P)
 
 [[ -n "$VERSION" ]] || { printf 'package: workspace version not found\n' >&2; exit 2; }
-[[ -x target/release/persist && -x target/release/persistd ]] || {
+[[ -x target/release/persist && -x target/release/persistd && -x target/release/persist-holder ]] || {
     printf 'package: build release binaries first\n' >&2; exit 2;
 }
 
 prepare_root() {
     root=$1
-    mkdir -p "$root/bin" "$root/completions" "$root/docs/user" "$root/docs/man"
+    mkdir -p "$root/bin" "$root/libexec/persistshell" "$root/completions" "$root/docs/user" "$root/docs/man"
     install -m 0755 target/release/persist "$root/bin/persist"
     install -m 0755 target/release/persistd "$root/bin/persistd"
+    install -m 0755 target/release/persist-holder "$root/libexec/persistshell/persist-holder"
     install -m 0644 README.md LICENSE CHANGELOG.md "$root/"
     install -m 0644 docs/INDEX.md "$root/docs/INDEX.md"
     install -m 0644 completions/persist.bash completions/_persist completions/persist.fish "$root/completions/"
@@ -45,9 +46,10 @@ package_deb() {
     command -v dpkg-deb >/dev/null || { printf 'package: dpkg-deb not found\n' >&2; return 2; }
     root="$DIST/deb-root"
     rm -rf "$root"
-    mkdir -p "$root/DEBIAN" "$root/usr/bin" "$root/usr/share/bash-completion/completions" "$root/usr/share/zsh/site-functions" "$root/usr/share/fish/vendor_completions.d" "$root/usr/share/doc/persistshell" "$root/usr/share/man/man1"
+    mkdir -p "$root/DEBIAN" "$root/usr/bin" "$root/usr/libexec/persistshell" "$root/usr/share/bash-completion/completions" "$root/usr/share/zsh/site-functions" "$root/usr/share/fish/vendor_completions.d" "$root/usr/share/doc/persistshell" "$root/usr/share/man/man1"
     install -m 0755 target/release/persist "$root/usr/bin/persist"
     install -m 0755 target/release/persistd "$root/usr/bin/persistd"
+    install -m 0755 target/release/persist-holder "$root/usr/libexec/persistshell/persist-holder"
     install -m 0644 completions/persist.bash "$root/usr/share/bash-completion/completions/persist"
     install -m 0644 completions/_persist "$root/usr/share/zsh/site-functions/_persist"
     install -m 0644 completions/persist.fish "$root/usr/share/fish/vendor_completions.d/persist.fish"
@@ -77,9 +79,10 @@ BuildArch: x86_64
 Persistent interactive shell runtime.
 
 %install
-mkdir -p %{buildroot}/usr/bin %{buildroot}/usr/share/bash-completion/completions %{buildroot}/usr/share/zsh/site-functions %{buildroot}/usr/share/fish/vendor_completions.d %{buildroot}/usr/share/doc/persistshell %{buildroot}/usr/share/man/man1
+mkdir -p %{buildroot}/usr/bin %{buildroot}/usr/libexec/persistshell %{buildroot}/usr/share/bash-completion/completions %{buildroot}/usr/share/zsh/site-functions %{buildroot}/usr/share/fish/vendor_completions.d %{buildroot}/usr/share/doc/persistshell %{buildroot}/usr/share/man/man1
 install -m 0755 "$REPO_ROOT/target/release/persist" %{buildroot}/usr/bin/persist
 install -m 0755 "$REPO_ROOT/target/release/persistd" %{buildroot}/usr/bin/persistd
+install -m 0755 "$REPO_ROOT/target/release/persist-holder" %{buildroot}/usr/libexec/persistshell/persist-holder
 install -m 0644 "$REPO_ROOT/completions/persist.bash" %{buildroot}/usr/share/bash-completion/completions/persist
 install -m 0644 "$REPO_ROOT/completions/_persist" %{buildroot}/usr/share/zsh/site-functions/_persist
 install -m 0644 "$REPO_ROOT/completions/persist.fish" %{buildroot}/usr/share/fish/vendor_completions.d/persist.fish
@@ -89,6 +92,7 @@ install -m 0644 "$REPO_ROOT"/docs/man/*.1 %{buildroot}/usr/share/man/man1/
 %files
 /usr/bin/persist
 /usr/bin/persistd
+/usr/libexec/persistshell/persist-holder
 /usr/share/bash-completion/completions/persist
 /usr/share/zsh/site-functions/_persist
 /usr/share/fish/vendor_completions.d/persist.fish

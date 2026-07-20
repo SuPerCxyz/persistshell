@@ -130,26 +130,27 @@ getent passwd "$USER"
 
 创建 Session 时需要设置环境变量。
 
-基础变量：
+启动环境分层：
 
 ```text
-HOME
-USER
-LOGNAME
-SHELL
-TERM
-LANG
-LC_*
-PATH
-PWD
+当前 runtime 身份和基础环境
+saved_set
+saved_unset
+current connection override
+private PersistShell environment
 ```
 
 注意：
 
+- 所有名称、值、冲突、数量和容量必须在 fork 前验证并转换为 CString。
+- child 只按固定顺序执行有界 `setenv`/`unsetenv`，unset 不能用空字符串代替。
+- `HOME`、`USER`、`LOGNAME`、`SHELL`、`PATH`、`PWD`、`XDG_*` 和 `PERSIST_*`
+  不能由 saved snapshot 覆盖或删除。
+- 当前连接变量覆盖 child 继承环境；private runtime 变量最后应用。
+- Shell exec 和用户 rc 仍可在启动后修改普通变量。
 - 不要盲目复制所有 SSH 环境变量。
 - 不要记录敏感环境变量。
-- attach 时不要随意覆盖已有 Session 环境。
-- SSH_AUTH_SOCK 同步放到后续阶段。
+- Running Session attach 不覆盖已有 Session 环境。
 
 ---
 

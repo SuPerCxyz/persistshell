@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io::{self, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
@@ -6,6 +7,7 @@ use persist_core::{PersistError, Result};
 
 pub const MAX_CONTROL_FRAME: usize = 1024 * 1024;
 pub const MAX_IO_FRAME: usize = 64 * 1024;
+pub const ATTACH_CONTEXT_PROTOCOL_MINOR: u16 = 2;
 
 pub const HEADER_SIZE: usize = 12;
 pub const STDIN_FRAME_MAX: usize = MAX_IO_FRAME;
@@ -337,16 +339,135 @@ pub struct AttachPayload {
     pub session_id: u32,
 }
 
+const ATTACH_CONTEXT_VERSION: u8 = 1;
+const MAX_CONNECTION_ENV_VARIABLES: usize = 8;
+const MAX_CONNECTION_ENV_NAME: usize = 32;
+const MAX_CONNECTION_ENV_VALUE: usize = 4096;
+const CONNECTION_ENV_ALLOWLIST: [&str; MAX_CONNECTION_ENV_VARIABLES] = [
+    "COLORTERM",
+    "DISPLAY",
+    "SSH_AUTH_SOCK",
+    "SSH_CLIENT",
+    "SSH_CONNECTION",
+    "SSH_TTY",
+    "TERM",
+    "WAYLAND_DISPLAY",
+];
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ConnectionEnvironment {
+    variables: BTreeMap<String, String>,
+}
+
+impl ConnectionEnvironment {
+    pub fn from_pairs<I, K, V>(pairs: I) -> Option<Self>
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let mut variables = BTreeMap::new();
+        for (name, value) in pairs {
+            let name = name.as_ref();
+            let value = value.as_ref();
+            if variables.len() >= MAX_CONNECTION_ENV_VARIABLES
+                || !valid_connection_variable(name, value)
+                || variables
+                    .insert(name.to_owned(), value.to_owned())
+                    .is_some()
+            {
+                return None;
+            }
+        }
+        Some(Self { variables })
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.variables.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.variables
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.as_str()))
+    }
+}
+
+fn valid_connection_variable(name: &str, value: &str) -> bool {
+    CONNECTION_ENV_ALLOWLIST.contains(&name)
+        && !name.is_empty()
+        && name.len() <= MAX_CONNECTION_ENV_NAME
+        && !value.is_empty()
+        && value.len() <= MAX_CONNECTION_ENV_VALUE
+        && !value.chars().any(char::is_control)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecodedAttachPayload {
+    pub session_id: u32,
+    pub connection_env: ConnectionEnvironment,
+}
+
 pub fn encode_attach(p: &AttachPayload) -> Vec<u8> {
     p.session_id.to_be_bytes().to_vec()
 }
 
-pub fn decode_attach(data: &[u8]) -> Option<AttachPayload> {
+pub fn encode_attach_with_context(
+    payload: &AttachPayload,
+    context: &ConnectionEnvironment,
+) -> Vec<u8> {
+    let mut output = Vec::with_capacity(6 + context.variables.len() * 16);
+    output.extend_from_slice(&payload.session_id.to_be_bytes());
+    output.push(ATTACH_CONTEXT_VERSION);
+    output.push(context.variables.len() as u8);
+    for (name, value) in &context.variables {
+        output.push(name.len() as u8);
+        output.extend_from_slice(name.as_bytes());
+        output.extend_from_slice(&(value.len() as u16).to_be_bytes());
+        output.extend_from_slice(value.as_bytes());
+    }
+    output
+}
+
+pub fn decode_attach(data: &[u8]) -> Option<DecodedAttachPayload> {
     if data.len() < 4 {
         return None;
     }
-    Some(AttachPayload {
-        session_id: u32::from_be_bytes(data[0..4].try_into().ok()?),
+    let session_id = u32::from_be_bytes(data[0..4].try_into().ok()?);
+    if data.len() == 4 {
+        return Some(DecodedAttachPayload {
+            session_id,
+            connection_env: ConnectionEnvironment::default(),
+        });
+    }
+    if data.len() < 6 || data[4] != ATTACH_CONTEXT_VERSION {
+        return None;
+    }
+
+    let count = data[5] as usize;
+    if count > MAX_CONNECTION_ENV_VARIABLES {
+        return None;
+    }
+    let mut offset = 6;
+    let mut pairs = Vec::with_capacity(count);
+    for _ in 0..count {
+        let name_len = *data.get(offset)? as usize;
+        offset += 1;
+        let name = std::str::from_utf8(data.get(offset..offset.checked_add(name_len)?)?).ok()?;
+        offset += name_len;
+        let value_len =
+            u16::from_be_bytes(data.get(offset..offset.checked_add(2)?)?.try_into().ok()?) as usize;
+        offset += 2;
+        let value = std::str::from_utf8(data.get(offset..offset.checked_add(value_len)?)?).ok()?;
+        offset += value_len;
+        pairs.push((name, value));
+    }
+    if offset != data.len() {
+        return None;
+    }
+    Some(DecodedAttachPayload {
+        session_id,
+        connection_env: ConnectionEnvironment::from_pairs(pairs)?,
     })
 }
 
@@ -1075,7 +1196,10 @@ pub struct ProtocolVersion {
 }
 
 impl ProtocolVersion {
-    pub const CURRENT: Self = Self { major: 0, minor: 1 };
+    pub const CURRENT: Self = Self {
+        major: 0,
+        minor: ATTACH_CONTEXT_PROTOCOL_MINOR,
+    };
 
     pub fn is_compatible(&self, other: &Self) -> bool {
         self.major == other.major
@@ -1231,6 +1355,70 @@ mod tests {
 
         assert!(v1.is_compatible(&v2));
         assert!(!v1.is_compatible(&v3));
+        assert_eq!(
+            ProtocolVersion::CURRENT.minor,
+            ATTACH_CONTEXT_PROTOCOL_MINOR
+        );
+    }
+
+    #[test]
+    fn attach_accepts_legacy_and_round_trips_connection_environment() {
+        let legacy = decode_attach(&42_u32.to_be_bytes()).expect("legacy attach");
+        assert_eq!(legacy.session_id, 42);
+        assert!(legacy.connection_env.is_empty());
+
+        let context = ConnectionEnvironment::from_pairs([
+            ("TERM", "xterm-256color"),
+            ("SSH_CONNECTION", "192.0.2.1 1234 192.0.2.2 22"),
+        ])
+        .expect("valid context");
+        let encoded = encode_attach_with_context(&AttachPayload { session_id: 42 }, &context);
+        assert_eq!(&encoded[..4], &42_u32.to_be_bytes());
+
+        let decoded = decode_attach(&encoded).expect("extended attach");
+        assert_eq!(decoded.session_id, 42);
+        assert_eq!(decoded.connection_env, context);
+    }
+
+    #[test]
+    fn connection_environment_rejects_unknown_duplicate_and_invalid_values() {
+        assert!(ConnectionEnvironment::from_pairs([("UNSAFE", "value")]).is_none());
+        assert!(
+            ConnectionEnvironment::from_pairs([("TERM", "xterm"), ("TERM", "screen")]).is_none()
+        );
+        assert!(ConnectionEnvironment::from_pairs([("TERM", "bad\nvalue")]).is_none());
+        assert!(
+            ConnectionEnvironment::from_pairs([("SSH_CONNECTION", "x".repeat(4097))]).is_none()
+        );
+    }
+
+    #[test]
+    fn extended_attach_rejects_malformed_or_noncanonical_payloads() {
+        let valid = ConnectionEnvironment::from_pairs([("TERM", "xterm")]).expect("context");
+        let encoded = encode_attach_with_context(&AttachPayload { session_id: 7 }, &valid);
+
+        let mut trailing = encoded.clone();
+        trailing.push(0);
+        assert!(decode_attach(&trailing).is_none());
+
+        let mut invalid_utf8 = encoded.clone();
+        *invalid_utf8.last_mut().expect("value byte") = 0xff;
+        assert!(decode_attach(&invalid_utf8).is_none());
+
+        let mut unknown = encoded.clone();
+        let name_start = 7;
+        unknown[name_start..name_start + 4].copy_from_slice(b"NOPE");
+        assert!(decode_attach(&unknown).is_none());
+
+        let duplicate = ConnectionEnvironment::from_pairs([("TERM", "xterm")])
+            .map(|context| encode_attach_with_context(&AttachPayload { session_id: 7 }, &context))
+            .expect("encoded");
+        let mut duplicate_wire = duplicate.clone();
+        duplicate_wire[5] = 2;
+        duplicate_wire.extend_from_slice(&duplicate[6..]);
+        assert!(decode_attach(&duplicate_wire).is_none());
+
+        assert!(decode_attach(&encoded[..encoded.len() - 1]).is_none());
     }
 
     #[test]

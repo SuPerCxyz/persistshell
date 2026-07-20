@@ -11,6 +11,7 @@ use std::os::unix::io::RawFd;
 use std::path::Path;
 use std::time::Duration;
 
+use persist_core::shell_state::ShellLaunchEnvironment;
 use persist_core::{PersistError, Result};
 
 use crate::pty::{detect_shell, open_pty, set_nonblocking};
@@ -54,15 +55,18 @@ impl PtyEngine {
         environment: &[(String, String)],
         arguments: &[String],
     ) -> Result<PtySession> {
-        let (master_fd, slave_path) = open_pty()?;
+        let environment = legacy_launch_environment(environment)?;
+        self.open_session_with_launch_environment(shell, histfile, cwd, &environment, arguments)
+    }
 
-        let slave_cstr = CString::new(
-            slave_path
-                .to_str()
-                .ok_or_else(|| PersistError::invalid_argument("slave path is not valid UTF-8"))?,
-        )
-        .map_err(|_| PersistError::invalid_argument("slave path contains null bytes"))?;
-
+    pub fn open_session_with_launch_environment(
+        &self,
+        shell: &str,
+        histfile: Option<&str>,
+        cwd: Option<&Path>,
+        environment: &ShellLaunchEnvironment,
+        arguments: &[String],
+    ) -> Result<PtySession> {
         let shell_cstr = CString::new(shell)
             .map_err(|_| PersistError::invalid_argument("shell path contains null bytes"))?;
         let argument_cstr = arguments
@@ -88,36 +92,26 @@ impl PtyEngine {
                     .map_err(|_| PersistError::invalid_argument("cwd path contains null bytes"))
             })
             .transpose()?;
-        let environment_cstr = environment
+        let saved_set = environment_pairs_to_cstring(environment.saved_set())?;
+        let saved_unset = environment
+            .saved_unset()
             .iter()
-            .map(|(name, value)| {
-                if name.is_empty() || name.contains('=') {
-                    return Err(PersistError::invalid_argument(
-                        "environment variable name is invalid",
-                    ));
-                }
-                Ok((
-                    CString::new(name.as_str()).map_err(|_| {
-                        PersistError::invalid_argument(
-                            "environment variable name contains null bytes",
-                        )
-                    })?,
-                    CString::new(value.as_str()).map_err(|_| {
-                        PersistError::invalid_argument(
-                            "environment variable value contains null bytes",
-                        )
-                    })?,
-                ))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let agent_socket = std::env::var_os("SSH_AUTH_SOCK")
-            .filter(|path| is_valid_agent_socket(Path::new(path)))
-            .map(|path| {
-                CString::new(path.as_encoded_bytes()).map_err(|_| {
-                    PersistError::invalid_argument("SSH_AUTH_SOCK contains null bytes")
+            .map(|name| {
+                CString::new(name.as_str()).map_err(|_| {
+                    PersistError::invalid_argument("environment variable name contains null bytes")
                 })
             })
-            .transpose()?;
+            .collect::<Result<Vec<_>>>()?;
+        let connection = environment_pairs_to_cstring(environment.connection())?;
+        let private = environment_pairs_to_cstring(environment.private())?;
+
+        let (master_fd, slave_path) = open_pty()?;
+        let slave_cstr = CString::new(
+            slave_path
+                .to_str()
+                .ok_or_else(|| PersistError::invalid_argument("slave path is not valid UTF-8"))?,
+        )
+        .map_err(|_| PersistError::invalid_argument("slave path contains null bytes"))?;
 
         match unsafe { libc::fork() } {
             -1 => {
@@ -134,8 +128,10 @@ impl PtyEngine {
                     arguments: argument_cstr,
                     histfile: histfile_cstr,
                     cwd: cwd_cstr,
-                    environment: environment_cstr,
-                    agent_socket,
+                    saved_set,
+                    saved_unset,
+                    connection,
+                    private,
                 };
                 child_setup(slave_cstr, master_fd, context);
                 unsafe { libc::_exit(127) };
@@ -164,13 +160,46 @@ fn is_valid_agent_socket(path: &Path) -> bool {
         && std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_socket())
 }
 
+fn legacy_launch_environment(environment: &[(String, String)]) -> Result<ShellLaunchEnvironment> {
+    let connection = if environment.iter().any(|(name, _)| name == "SSH_AUTH_SOCK") {
+        Vec::new()
+    } else {
+        std::env::var_os("SSH_AUTH_SOCK")
+            .filter(|value| is_valid_agent_socket(Path::new(value)))
+            .and_then(|value| value.into_string().ok())
+            .map(|value| vec![("SSH_AUTH_SOCK".to_owned(), value)])
+            .unwrap_or_default()
+    };
+    ShellLaunchEnvironment::new(Vec::new(), Vec::new(), connection, environment.to_vec())
+}
+
+fn environment_pairs_to_cstring(
+    environment: &[(String, String)],
+) -> Result<Vec<(CString, CString)>> {
+    environment
+        .iter()
+        .map(|(name, value)| {
+            Ok((
+                CString::new(name.as_str()).map_err(|_| {
+                    PersistError::invalid_argument("environment variable name contains null bytes")
+                })?,
+                CString::new(value.as_str()).map_err(|_| {
+                    PersistError::invalid_argument("environment variable value contains null bytes")
+                })?,
+            ))
+        })
+        .collect()
+}
+
 struct ChildContext {
     shell_cstr: CString,
     arguments: Vec<CString>,
     histfile: Option<CString>,
     cwd: Option<CString>,
-    environment: Vec<(CString, CString)>,
-    agent_socket: Option<CString>,
+    saved_set: Vec<(CString, CString)>,
+    saved_unset: Vec<CString>,
+    connection: Vec<(CString, CString)>,
+    private: Vec<(CString, CString)>,
 }
 
 fn child_setup(slave_cstr: CString, master_fd: RawFd, context: ChildContext) {
@@ -179,8 +208,10 @@ fn child_setup(slave_cstr: CString, master_fd: RawFd, context: ChildContext) {
         arguments,
         histfile,
         cwd,
-        environment,
-        agent_socket,
+        saved_set,
+        saved_unset,
+        connection,
+        private,
     } = context;
     unsafe {
         if !reset_child_signals() {
@@ -208,15 +239,17 @@ fn child_setup(slave_cstr: CString, master_fd: RawFd, context: ChildContext) {
             libc::chdir(cwd.as_ptr());
         }
 
-        for (name, value) in environment {
+        for (name, value) in saved_set {
             libc::setenv(name.as_ptr(), value.as_ptr(), 1);
         }
-
-        let agent_name = CString::new("SSH_AUTH_SOCK").expect("agent variable name is valid");
-        if let Some(agent_socket) = agent_socket {
-            libc::setenv(agent_name.as_ptr(), agent_socket.as_ptr(), 1);
-        } else {
-            libc::unsetenv(agent_name.as_ptr());
+        for name in saved_unset {
+            libc::unsetenv(name.as_ptr());
+        }
+        for (name, value) in connection {
+            libc::setenv(name.as_ptr(), value.as_ptr(), 1);
+        }
+        for (name, value) in private {
+            libc::setenv(name.as_ptr(), value.as_ptr(), 1);
         }
 
         if let Some(ref hf) = histfile {
@@ -557,6 +590,92 @@ mod tests {
             output.contains("/:restored"),
             "unexpected output: {output:?}"
         );
+    }
+
+    #[test]
+    fn structured_environment_applies_set_unset_connection_and_private_layers() {
+        std::env::set_var("M55_PTY_VALUE", "daemon");
+        std::env::set_var("M55_PTY_REMOVE", "daemon");
+        let environment = persist_core::shell_state::ShellLaunchEnvironment::new(
+            vec![("M55_PTY_VALUE".into(), "saved".into())],
+            vec!["M55_PTY_REMOVE".into()],
+            vec![("TERM".into(), "persist-stage4".into())],
+            vec![("PERSIST_STAGE4_PRIVATE".into(), "private".into())],
+        )
+        .expect("valid launch environment");
+        let engine = PtyEngine::new();
+        let mut session = engine
+            .open_session_with_launch_environment(
+                "/bin/sh",
+                None,
+                None,
+                &environment,
+                &[
+                    "-c".into(),
+                    "printf '%s:' \"$M55_PTY_VALUE\"; M55_PTY_VALUE=rc; \
+                     printf '%s:%s:%s:%s\\n' \"$M55_PTY_VALUE\" \
+                     \"${M55_PTY_REMOVE-unset}\" \"$TERM\" \
+                     \"$PERSIST_STAGE4_PRIVATE\"; exec /bin/sh"
+                        .into(),
+                ],
+            )
+            .expect("open session");
+
+        let mut output = String::new();
+        let mut buffer = [0_u8; 4096];
+        for _ in 0..20 {
+            if session
+                .poll_output(Duration::from_millis(100))
+                .expect("poll")
+            {
+                let count = session.read_output(&mut buffer).expect("read");
+                output.push_str(&String::from_utf8_lossy(&buffer[..count]));
+                if output.contains("saved:rc:unset:persist-stage4:private") {
+                    break;
+                }
+            }
+        }
+        std::env::remove_var("M55_PTY_VALUE");
+        std::env::remove_var("M55_PTY_REMOVE");
+        assert!(
+            output.contains("saved:rc:unset:persist-stage4:private"),
+            "output was {output:?}"
+        );
+    }
+
+    #[test]
+    fn structured_environment_rejects_forbidden_conflicting_and_invalid_entries() {
+        use persist_core::shell_state::ShellLaunchEnvironment;
+
+        assert!(ShellLaunchEnvironment::new(
+            vec![("HOME".into(), "/unsafe".into())],
+            vec![],
+            vec![],
+            vec![]
+        )
+        .is_err());
+        assert!(ShellLaunchEnvironment::new(
+            vec![("PERSIST_PRIVATE".into(), "unsafe".into())],
+            vec![],
+            vec![],
+            vec![]
+        )
+        .is_err());
+        assert!(ShellLaunchEnvironment::new(vec![], vec!["PATH".into()], vec![], vec![]).is_err());
+        assert!(ShellLaunchEnvironment::new(
+            vec![("M55_DUPLICATE".into(), "set".into())],
+            vec!["M55_DUPLICATE".into()],
+            vec![],
+            vec![]
+        )
+        .is_err());
+        assert!(ShellLaunchEnvironment::new(
+            vec![("M55_BAD".into(), "bad\0value".into())],
+            vec![],
+            vec![],
+            vec![]
+        )
+        .is_err());
     }
 
     #[test]

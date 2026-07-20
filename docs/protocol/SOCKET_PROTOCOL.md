@@ -284,6 +284,47 @@ capabilities
 
 ---
 
+## Attach Connection Context
+
+public protocol 当前版本为 `0.2`。legacy Attach payload 仍是唯一的 4-byte big-endian
+`session_id`。当 Client 与 Daemon 协商的 minor 均支持 `0.2` 时，Client 可以追加：
+
+```text
+u8  extension_version = 1
+u8  variable_count
+repeat variable_count:
+  u8  name_length
+  bytes name
+  u16 value_length
+  bytes value
+```
+
+允许的名称固定为：
+
+```text
+TERM COLORTERM SSH_AUTH_SOCK SSH_CLIENT SSH_CONNECTION SSH_TTY
+DISPLAY WAYLAND_DISPLAY
+```
+
+最多 8 项，名称最多 32 bytes，单值最多 4096 bytes。名称和值必须是 UTF-8，值不能为空，
+也不能包含控制字符。decoder 必须拒绝未知名、重复名、截断、尾随垃圾和超限输入。
+
+`SSH_AUTH_SOCK` 必须是绝对路径、当前 UID 所有的非 symlink Unix socket。Client 采集时和
+Daemon 接收时都必须验证；失败时只丢弃该项，不能回退使用 daemon 启动时继承的旧 agent。
+
+connection context 只属于当前 Attach 请求，不写 metadata、Shell 状态文件或日志。Running
+Session attach 不改变 runtime 环境；Closed Session 恢复边界接收该上下文，环境合并
+阶段再决定如何应用。
+
+兼容规则：
+
+- 新 decoder 接受精确 4-byte legacy payload。
+- 新 Client 收到旧 daemon 的 `0.1` HELLO_ACK 时只发送 legacy payload。
+- 旧 decoder 读取新 payload 的前 4 bytes，仍得到相同 Session ID。
+- 同一 major 的 minor 差异不导致握手失败。
+
+---
+
 ## 协议版本
 
 如果版本不兼容：

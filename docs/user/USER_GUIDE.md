@@ -31,12 +31,16 @@ SSH Server、堡垒机、Web Terminal 或远程桌面。
 
 ## 3. 安装
 
-发行包安装后应提供两个命令：
+发行包安装后提供两个用户命令和一个固定路径内部组件：
 
 ```bash
 persist --version
 persistd --version
+test -x /usr/libexec/persistshell/persist-holder
 ```
+
+不要直接运行 `persist-holder`。release 版 `persistd` 不通过 `PATH` 查找 Holder；源码 debug
+构建才允许使用同构建目录的二进制或 `PERSIST_HOLDER_PATH` 进行开发测试。
 
 启动当前用户 daemon：
 
@@ -341,6 +345,14 @@ persist top
 `s` 切换排序，`r` 切换 15 分钟/1 小时/24 小时趋势，`Esc` 返回，`q` 或 `Ctrl+C` 退出。
 指标每 5 秒刷新，窄小终端自动降级；`snapshot` 与 `metrics` 仍是一次性命令。
 
+`snapshot` 的 `output_log_state` 为 `healthy`、`degraded`、`disabled` 或 `unavailable`。`metrics`
+包含 degraded 日志和 `lost` Session 聚合计数；`persist doctor` 会将非零计数显示为告警。
+`lost` 表示 Holder runtime 已丢失且不能 attach，不代表可以自动恢复。
+
+`persist daemon status` 还显示 Holder 的 `holder_status`、`holder_pid`、`holder_instance`，以及
+`log_degraded`、`lost` 汇总。`persist doctor` 会连接 daemon 复核相同信息；Holder disconnected、
+日志 degraded 或存在 `lost` Session 时，诊断不报告健康。
+
 ## 13. Daemon 管理
 
 ```bash
@@ -394,8 +406,9 @@ metadata                  仅当前用户可访问
 
 Closed Session attach 会启动新的 Shell runtime，并尝试恢复：
 
-- 最后成功采样的 cwd
-- `TERM`、`COLORTERM`、`LANG`、`LC_*` 等受限启动环境
+- 正常退出时由 Shell 状态 side channel 提交的最终 cwd
+- `LANG`、`LC_*` 和用户明确允许的已导出变量，包括精确 unset
+- 当前 attach 提供的终端、SSH、display 和有效 agent socket
 - Session 独立 history
 - 输出日志和 metadata
 
@@ -404,14 +417,20 @@ Closed Session attach 会启动新的 Shell runtime，并尝试恢复：
 - 已经退出的前台进程
 - 普通子进程的内存状态
 - 完整终端画面状态
-- Shell 运行期间任意动态 `export` 的变量
+- 未导出的 Shell 局部变量
+- 未被 `[recovery.environment]` 允许的动态变量
 - 失效的旧 `SSH_AUTH_SOCK`
 
 有效的当前 SSH agent Unix socket 可在新 Session 启动时同步。普通文件、相对路径和失效 socket
-会被拒绝。
+会被拒绝。当前连接变量不会写入 metadata，下一次 attach 必须重新提供。
 
-快速执行 `cd /path; exit` 可能早于下一次 `/proc` cwd 采样，从而保留上一次 cwd。需要可靠恢复
-时，在退出前让 Shell 回到提示符，或避免在同一条命令中立即退出。
+默认 bash、zsh 和 fish 在正常 `exit`、空行 `Ctrl+D` 以及快速 `cd /path; exit` 时提交最终
+cwd。该机制使用临时 hook 和私有原子状态文件，不修改用户 rc。已有 Bash `EXIT` trap 时，
+PersistShell 不替换或解析用户 trap，只保留最近一次 prompt 提交；Shell 被 `SIGKILL`、用
+`exec` 替换、hook 被删除、嵌套 Shell 未继承 hook、cwd 非 UTF-8 或状态文件校验失败时，也会
+回退到最后一个可信 cwd。所有降级都不得阻塞 Shell 退出或破坏用户配置。
+环境快照同样采用上一可信值回退；旧 Holder 只能恢复 cwd 和旧白名单快照。敏感名称、身份与
+基础变量、`XDG_*` 和 `PERSIST_*` 永远不能通过 include 放宽。
 
 ## 17. 升级和卸载
 
@@ -429,6 +448,11 @@ persist doctor
 persist --version
 ```
 
+从 M52 及更早的“daemon 直接持有 PTY”架构升级时，升级前正在 running 的旧 metadata 没有
+可接管的 Holder runtime。新版本会将这些记录明确标记为 `lost`，不会伪造热迁移，也不能 attach。
+输出日志和 metadata 仍保留，可查看后创建新 Session。升级前先正常退出或关闭旧 Session 可避免
+留下此类 running 记录。
+
 只移除 SSH hook并保留数据：
 
 ```bash
@@ -442,6 +466,7 @@ persist uninstall --purge
 ```
 
 `--purge` 会删除当前用户的 Session metadata、日志和历史，执行前应确认不再需要这些内容。
+发行版包管理器的普通 remove/uninstall 不执行 `--purge`，必须保留用户配置、metadata、历史和日志。
 
 ## 18. 常见故障
 
@@ -468,6 +493,9 @@ persist install
 ```bash
 persist ls --plain
 ```
+
+若状态是 `lost`，该 Session 的 Holder runtime 已不存在，不能恢复 attach。使用 `persist log <id>`
+查看保留输出，再执行 `persist new` 创建新 Session。不要通过修改数据库把 `lost` 改回 `running`。
 
 若 Session 已锁定，执行 `persist unlock <id>`。另一台电脑已连接时，正常可写 attach 会请求
 takeover；只想观察时使用 `--readonly`。

@@ -8,7 +8,8 @@ use persist_core::{
     LoggerConfig, PersistError,
 };
 use persist_ipc::{
-    encode_hello, read_frame, write_frame, ClientSocket, Frame, HelloPayload, MessageType,
+    decode_note_get_resp, encode_hello, read_frame, write_frame, ClientSocket, Frame, HelloPayload,
+    MessageType,
 };
 
 use crate::command::{parse_command, Command};
@@ -82,6 +83,7 @@ fn command_uses_config(command: &Command) -> bool {
             | Command::New
             | Command::List { .. }
             | Command::HistoryAppend { .. }
+            | Command::BenchmarkAttach { .. }
             | Command::ProcessTree { .. }
             | Command::ProcessStats { .. }
             | Command::Snapshot { .. }
@@ -115,6 +117,8 @@ fn command_log_message(command: &Command) -> &'static str {
         Command::New => "command=new started",
         Command::List { .. } => "command=ls started",
         Command::HistoryAppend { .. } => "command=history_append started",
+        Command::ShellStateCommit => "command=shell_state_commit started",
+        Command::BenchmarkAttach { .. } => "command=benchmark_attach started",
         Command::ProcessTree { .. } => "command=ps started",
         Command::ProcessStats { .. } => "command=stats started",
         Command::Snapshot { .. } => "command=snapshot started",
@@ -207,6 +211,15 @@ fn execute<W: Write>(
                 &shell,
                 io::stdin().lock(),
             )
+        }
+        Command::ShellStateCommit => {
+            crate::shell_state::commit_from_reader(std::env::vars_os(), io::stdin().lock())
+        }
+        Command::BenchmarkAttach { session_id } => {
+            let config = loaded_config
+                .map(|(_, config)| config)
+                .ok_or_else(|| PersistError::internal_error("config not loaded"))?;
+            crate::attach::benchmark_attach(config, session_id)
         }
         Command::ProcessTree { session_id } => {
             let config = loaded_config
@@ -432,7 +445,8 @@ fn write_config_values_inner<W: Write>(
     write_logging_config(stdout, config)?;
     write_internal_log_config(stdout, config)?;
     write_security_config(stdout, config)?;
-    write_ssh_config(stdout, config)
+    write_ssh_config(stdout, config)?;
+    write_recovery_config(stdout, config)
 }
 
 fn write_config_sources<W: Write>(stdout: &mut W, options: &ConfigLoadOptions) -> io::Result<()> {
@@ -581,6 +595,24 @@ fn write_ssh_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()>
     writeln!(stdout, "ssh.bypass_env: {}", config.ssh.bypass_env)
 }
 
+fn write_recovery_config<W: Write>(stdout: &mut W, config: &Config) -> io::Result<()> {
+    writeln!(
+        stdout,
+        "recovery.environment.include: [{}]",
+        config.recovery.environment.include.join(", ")
+    )?;
+    writeln!(
+        stdout,
+        "recovery.environment.max_variables: {}",
+        config.recovery.environment.max_variables
+    )?;
+    writeln!(
+        stdout,
+        "recovery.environment.max_bytes: {}",
+        config.recovery.environment.max_bytes
+    )
+}
+
 fn write_doctor<W: Write>(
     stdout: &mut W,
     loaded_config: Option<&Config>,
@@ -619,11 +651,11 @@ fn write_doctor<W: Write>(
         ok = false;
     }
     doctor_check_path(stdout, "data_dir", &config.paths.data_dir)?;
-    if !doctor_check_dir_perms(stdout, "data_dir", &config.paths.data_dir, 0o755)? {
+    if !doctor_check_dir_perms(stdout, "data_dir", &config.paths.data_dir, 0o700)? {
         ok = false;
     }
     doctor_check_path(stdout, "state_dir", &config.paths.state_dir)?;
-    if !doctor_check_dir_perms(stdout, "state_dir", &config.paths.state_dir, 0o755)? {
+    if !doctor_check_dir_perms(stdout, "state_dir", &config.paths.state_dir, 0o700)? {
         ok = false;
     }
     doctor_check_path(stdout, "runtime_dir", &config.paths.runtime_dir)?;
@@ -860,7 +892,7 @@ fn doctor_check_daemon_health<W: Write>(
         Ok(mut sock) => {
             let payload = encode_hello(&HelloPayload {
                 protocol_major: 0,
-                protocol_minor: 1,
+                protocol_minor: persist_ipc::ATTACH_CONTEXT_PROTOCOL_MINOR,
                 uid: unsafe { libc::getuid() },
                 pid: std::process::id(),
             });
@@ -879,7 +911,7 @@ fn doctor_check_daemon_health<W: Write>(
             match read_frame(sock.stream()) {
                 Ok(ack) if ack.msg_type == MessageType::HelloAck => {
                     doctor_writeln(stdout, "  daemon: running ✓")?;
-                    Ok(true)
+                    doctor_check_daemon_metrics(stdout, &mut sock)
                 }
                 Ok(_) => {
                     doctor_writeln(stdout, "  daemon: unexpected response ⚠")?;
@@ -896,6 +928,119 @@ fn doctor_check_daemon_health<W: Write>(
             Ok(false)
         }
     }
+}
+
+fn doctor_check_daemon_metrics<W: Write>(
+    stdout: &mut W,
+    socket: &mut ClientSocket,
+) -> std::result::Result<bool, PersistError> {
+    if let Err(error) = write_frame(
+        socket.stream(),
+        &Frame {
+            msg_type: MessageType::Metrics,
+            flags: 0,
+            request_id: 1,
+            payload: Vec::new(),
+        },
+    ) {
+        doctor_writeln(
+            stdout,
+            &format!("  session logs: metrics failed ({error}) ⚠"),
+        )?;
+        return Ok(false);
+    }
+    let response = match read_frame(socket.stream()) {
+        Ok(response) if response.msg_type == MessageType::MetricsResp => response,
+        Ok(_) => {
+            doctor_writeln(stdout, "  session logs: unexpected metrics response ⚠")?;
+            return Ok(false);
+        }
+        Err(error) => {
+            doctor_writeln(
+                stdout,
+                &format!("  session logs: metrics failed ({error}) ⚠"),
+            )?;
+            return Ok(false);
+        }
+    };
+    let Some(degraded) = metric_count(&response.payload, "/sessions/log_degraded") else {
+        doctor_writeln(stdout, "  session logs: invalid metrics payload ⚠")?;
+        return Ok(false);
+    };
+    let Some(lost) = metric_count(&response.payload, "/sessions/lost") else {
+        doctor_writeln(stdout, "  runtime: invalid metrics payload ⚠")?;
+        return Ok(false);
+    };
+    let Some(holder_connected) = metric_bool(&response.payload, "/holder/connected") else {
+        doctor_writeln(stdout, "  holder: invalid metrics payload ⚠")?;
+        return Ok(false);
+    };
+    let mut healthy = true;
+    if holder_connected {
+        let holder_pid = metric_count(&response.payload, "/holder/pid");
+        let holder_instance = metric_string(&response.payload, "/holder/instance");
+        match (holder_pid, holder_instance) {
+            (Some(pid), Some(instance)) => doctor_writeln(
+                stdout,
+                &format!("  holder: connected (pid {pid}, instance {instance}) ✓"),
+            )?,
+            _ => {
+                doctor_writeln(stdout, "  holder: connected but identity is missing ⚠")?;
+                healthy = false;
+            }
+        }
+    } else {
+        doctor_writeln(
+            stdout,
+            "  holder: disconnected; active sessions unavailable ⚠",
+        )?;
+        healthy = false;
+    }
+    match degraded {
+        0 => {
+            doctor_writeln(stdout, "  session logs: healthy ✓")?;
+        }
+        count => {
+            doctor_writeln(
+                stdout,
+                &format!("  session logs: {count} degraded session(s) ⚠"),
+            )?;
+            healthy = false;
+        }
+    }
+    if lost == 0 {
+        doctor_writeln(stdout, "  runtime: no lost sessions ✓")?;
+    } else {
+        doctor_writeln(
+            stdout,
+            &format!("  runtime: {lost} lost session(s), attach unavailable ⚠"),
+        )?;
+        healthy = false;
+    }
+    Ok(healthy)
+}
+
+#[cfg(test)]
+fn degraded_log_count_from_metrics(payload: &[u8]) -> Option<u64> {
+    metric_count(payload, "/sessions/log_degraded")
+}
+
+fn metric_count(payload: &[u8], pointer: &str) -> Option<u64> {
+    metric_value(payload, pointer).and_then(|value| value.as_u64())
+}
+
+fn metric_bool(payload: &[u8], pointer: &str) -> Option<bool> {
+    metric_value(payload, pointer).and_then(|value| value.as_bool())
+}
+
+fn metric_string(payload: &[u8], pointer: &str) -> Option<String> {
+    metric_value(payload, pointer).and_then(|value| value.as_str().map(str::to_owned))
+}
+
+fn metric_value(payload: &[u8], pointer: &str) -> Option<serde_json::Value> {
+    decode_note_get_resp(payload)
+        .and_then(|json| serde_json::from_str::<serde_json::Value>(&json).ok())
+        .and_then(|value| value.pointer(pointer).cloned())
 }
 
 fn doctor_writeln<W: Write>(stdout: &mut W, s: &str) -> std::result::Result<(), PersistError> {
@@ -954,6 +1099,24 @@ mod tests {
     }
 
     #[test]
+    fn doctor_metrics_parser_requires_log_degraded_count() {
+        let valid = persist_ipc::encode_note_get_resp(
+            r#"{"holder":{"pid":42,"instance":"abcd","connected":true},"sessions":{"log_degraded":2,"lost":1}}"#,
+        );
+        assert_eq!(degraded_log_count_from_metrics(&valid), Some(2));
+        assert_eq!(metric_count(&valid, "/sessions/lost"), Some(1));
+        assert_eq!(metric_count(&valid, "/holder/pid"), Some(42));
+        assert_eq!(metric_bool(&valid, "/holder/connected"), Some(true));
+        assert_eq!(
+            metric_string(&valid, "/holder/instance").as_deref(),
+            Some("abcd")
+        );
+        let missing = persist_ipc::encode_note_get_resp(r#"{"sessions":{}}"#);
+        assert_eq!(degraded_log_count_from_metrics(&missing), None);
+        assert_eq!(degraded_log_count_from_metrics(b"invalid"), None);
+    }
+
+    #[test]
     fn unknown_command_returns_usage_error() {
         let mut out = Vec::new();
         let mut err = Vec::new();
@@ -994,6 +1157,9 @@ mod tests {
         assert!(output.contains("ring_buffer.default_size: 8MB"));
         assert!(output.contains("internal_log.level: info"));
         assert!(output.contains("ssh.bypass_env: PERSIST_DISABLE"));
+        assert!(output.contains("recovery.environment.include: []"));
+        assert!(output.contains("recovery.environment.max_variables: 128"));
+        assert!(output.contains("recovery.environment.max_bytes: 64KB"));
     }
 
     #[test]

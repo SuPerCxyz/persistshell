@@ -98,9 +98,10 @@ Daemon 必须防止同一用户启动多个实例。
 
 ## Shell 进程
 
-每个 Session 对应一个 Shell 进程。
+每个运行中的 Session 对应一个 Shell 进程。
 
-Shell 由 Daemon 通过 PTY Engine 创建。
+Shell 由单一 per-user Holder 通过 PTY Engine 创建；Daemon 只通过 Holder 私有协议管理
+runtime，不持有 PTY master，也不直接 reap Shell。
 
 Shell 应拥有：
 
@@ -114,6 +115,10 @@ Shell 应拥有：
 用户原配置，不编辑 dotfile，不覆盖已有 prompt/history hook，并在失败时降级为普通 Shell。
 hook 通过短生命周期 `persist` helper 写入受限的 Session 命令记录；helper 失败不能阻塞 prompt
 或改变上一条用户命令的退出状态。
+
+同一集成层还为每次 runtime 注入独立的最终状态 hook，通过隐藏 `persist __state-commit`
+helper 将 cwd、runtime identity 和 sequence 原子写入 `0700` 状态目录中的 `0600` 文件。该
+hook 不修改用户 rc、不包装 `cd`/`exit`，失败时降级且不得改变用户命令或退出语义。
 
 ---
 
@@ -220,26 +225,29 @@ daemon fork shell
 
 ---
 
-## Supervisor 模型
+## PTY Holder 模型
 
-后续可以考虑：
+M53 采用单一 per-user 数据平面：
 
 ```text
-user supervisor
-    ├── daemon
-    ├── pty holder
-    └── shell
+persistd
+   ↕ private Unix Socket
+persist-holder
+   ├── shell(session 1)
+   ├── shell(session 2)
+   └── shell(session N)
 ```
 
-用于提高 daemon 崩溃恢复能力。
+`persist-holder` 使用 `epoll` 统一持有和排空 PTY。daemon 负责控制面、公共 IPC 和 metadata；
+daemon 崩溃后 holder 与 Shell 继续运行，daemon 重启后通过 inventory 对账恢复控制。
 
-但 Phase 1 不实现。
+holder 自身崩溃和系统重启后的 runtime 恢复不属于 M53 承诺。
 
 ---
 
 ## Zombie 处理
 
-Daemon 必须处理 SIGCHLD。
+Holder 必须通过 `signalfd`/`waitpid` 处理 Shell 的 SIGCHLD。
 
 当 Shell 子进程退出：
 
@@ -247,20 +255,20 @@ Daemon 必须处理 SIGCHLD。
 - 获取 exit code
 - 更新 Session 状态
 - 清理 PTY
-- 保存 cwd/env snapshot
+- 验证状态文件并保留可选最终 cwd 和版本化环境 snapshot
 - 标记 Closed
 
-不能产生 zombie process。
+Holder 向 daemon 提供 `SessionExited` 和 `GetExitContext`；minor 1 保持 cwd-only，控制连接
+协商 minor 2 和 environment capability 后可附带版本化环境 snapshot。daemon 先提交 metadata，
+再调用 `RetireExited`。daemon 离线时 Holder 继续保留有界退出上下文，直至重连对账。不能产生
+zombie process，也不能在 metadata 失败时提前丢弃退出上下文。
 
 ---
 
 ## Orphan 处理
 
-如果 daemon 异常退出，Shell 可能成为 orphan 或被 SIGHUP 影响。
-
-Phase 1 不承诺 daemon 崩溃后恢复 Session。
-
-需要在 LIMITATIONS.md 中明确。
+M53 实施前，daemon 异常退出仍可能使 Shell 成为 orphan 或被 SIGHUP 影响。M53 完成后，
+Shell 是 holder 的子进程；daemon 控制连接异常断开只进入等待接管状态，不结束 runtime。
 
 ---
 
@@ -301,9 +309,10 @@ Phase 1 可以先实现按需 daemon。
 必须满足：
 
 1. Client 退出不杀 Session Shell。
-2. Daemon 是 PTY master owner。
+2. M53 完成后 Holder 是唯一 PTY master owner。
 3. Shell 不依赖 SSH 连接存活。
 4. Ctrl+C 不杀 daemon。
 5. SIGCHLD 被正确回收。
 6. 一个用户的 daemon 不管理其它用户 Session。
 7. 非交互 SSH 不进入 PersistShell 进程模型。
+8. Daemon 控制连接异常断开不能触发 Holder 级联关闭。

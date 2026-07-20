@@ -7,6 +7,7 @@ mod dashboard;
 mod installer;
 mod session;
 mod session_browser;
+mod shell_state;
 mod terminal;
 
 #[cfg(test)]

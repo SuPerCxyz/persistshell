@@ -16,6 +16,9 @@ daemon over a Unix socket and manages interactive shell sessions.
 The shell runtime is released when the shell exits; persisted metadata,
 output, working directory, and the restricted recovery environment remain
 available for a later recovery attach.
+Allowed exported variables and explicit unsets are restored for Closed
+sessions.  Terminal, SSH, display, and agent variables come from the current
+attach and are not persisted.
 .SH COMMANDS
 .TP
 .B help
@@ -25,13 +28,18 @@ Show command help.  This is also the behavior with no arguments.
 Show the client version.
 .TP
 .B doctor
-Check local configuration and runtime prerequisites.
+Check local configuration and runtime prerequisites.  When the daemon is
+running, report Holder connection, PID and instance, degraded output logs,
+and lost sessions.  A disconnected Holder or nonzero degraded/lost count is
+reported as unhealthy.
 .TP
 .B config [show]
 Print the effective configuration.
 .TP
 .B daemon {start|stop|status}
-Start, stop, or report the per-user daemon.
+Start, stop, or report the per-user daemon.  Status includes Holder connection,
+PID and instance plus degraded-log and lost-session totals when metrics are
+available.
 .TP
 .B new
 Create a session without attaching to it.

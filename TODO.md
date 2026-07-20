@@ -100,19 +100,6 @@
 - [x] 支持敏感关键词最小脱敏测试
 - [ ] 支持内部日志轮转完整实现
 
-### Daemon
-
-- [ ] 实现 per-user daemon
-- [ ] 实现 daemon start
-- [ ] 实现 daemon stop
-- [ ] 实现 daemon status
-- [ ] 实现 daemon 自动启动
-- [ ] 实现 daemon 空闲退出策略
-- [ ] 实现 daemon 日志
-- [ ] 实现 daemon 错误处理
-- [ ] 实现 daemon 崩溃提示
-- [ ] 实现 daemon 单实例锁
-
 ### IPC
 
 - [x] 设计 Unix Socket 协议（SOCKET_PROTOCOL.md）
@@ -138,7 +125,9 @@
 - [x] 实现优雅退出（SIGTERM → 清理 socket/PID → 退出）
 - [x] 实现 daemon 日志（使用 M03 日志框架）
 - [x] 实现 daemon 错误处理（使用 M04 错误框架）
-- [ ] 实现 daemon 崩溃提示（M06 之后）
+- [x] 实现 daemon 自动启动（安装 hook 执行 `persist daemon start`）
+- [x] 实现 daemon 崩溃提示（M19：client 断线提示）
+- [ ] 实现 daemon 进程自身的空闲退出策略（区别于 Session Idle GC）
 
 ### PTY Engine
 
@@ -148,8 +137,8 @@
 - [x] 实现 TIOCSCTTY
 - [x] 实现 exec 用户默认 shell
 - [x] 支持读取用户默认 shell（getpwuid_r，fallback SHELL env，fallback /bin/sh）
-- [ ] 支持 termios 初始化
-- [ ] 支持 raw mode
+- [ ] 支持 PTY slave 的显式 termios 初始化
+- [x] 支持 client raw mode（RAII 进入和恢复）
 - [x] 支持 PTY master 非阻塞
 - [x] 支持 PTY 生命周期清理（drop 自动清理）
 - [-] 支持 SIGCHLD（M08+ — daemon io_loop 通过 PTY read 返回 0 检测 exit，当前用 poll 轮询）
@@ -163,9 +152,9 @@
 - [x] 实现 client stdin 到 PTY（通过 STDIN frame → write_input）
 - [x] 实现 PTY output 到 client stdout（read_output → STDOUT frame）
 - [x] 实现 poll 驱动（io_loop 使用 poll() + FrameAccumulator）
-- [ ] 避免阻塞写
+- [x] PTY master 与 client socket 使用非阻塞 I/O
 - [ ] 慢客户端处理
-- [ ] 大输出处理
+- [x] 大输出分片与压力测试（M21）
 - [ ] 输出风暴保护
 - [x] EOF 处理（raw mode + STDIN 字节 → shell 自行处理）
 
@@ -194,15 +183,15 @@
 - [x] Close Session（M10：SIGHUP + 等待退出）
 - [x] Rename Session
 - [x] List Session（LIST_SESSIONS → 返回列表）
-- [ ] 查询 Session 详情
-- [ ] 更新 Session 状态
+- [x] 查询 Session 详情（snapshot/process-tree/stats）
+- [x] 更新 Session 状态（metadata status/close/reopen）
 - [x] 处理 Closed Session（M14：释放 runtime、保存恢复上下文并支持 attach 冷恢复）
 - [x] 支持 Closed Session attach 冷恢复（M14）
-- [ ] 处理 Zombie Session
-- [ ] 处理 Detached Session
-- [ ] Session ID 生成
-- [ ] Session Name 生成
-- [ ] Session 权限检查
+- [x] 处理 Zombie Session（waitpid 回收并转为 Closed）
+- [x] 处理 Detached Session（释放 writer，保留 PTY runtime）
+- [x] Session ID 生成（基于持久化最大 ID）
+- [x] Session Name 生成（M23）
+- [x] Session 权限检查（per-user socket + peer credential）
 
 ### Metadata Store
 
@@ -213,9 +202,9 @@
 - [x] 存储 Session metadata（session_id, name, status, timestamps）
 - [x] 存储 exit code（close_session / kill_session 时记录）
 - [x] 存储 cwd（create_session 时记录）
-- [ ] 存储 shell pid（M11 范围外）
+- [ ] 将 shell pid 持久化到 metadata（运行时可查询，当前未落库）
 - [x] 存储 created/active time（created_at, updated_at, closed_at）
-- [ ] 存储 source client（M11 范围外）
+- [ ] 将 source client 持久化到 metadata
 - [x] 权限安全检查（DB 文件继承目录权限）
 
 ### Ring Buffer (M12)
@@ -224,8 +213,7 @@
 - [x] 支持循环覆盖
 - [x] 支持 attach 回放（AttachResp 后、实时 I/O 前发送受限 Stdout frames）
 - [x] 支持配置大小（config.ring_buffer.default_size）
-- [ ] 支持慢客户端丢弃策略（M12 范围外）
-- [ ] 添加 benchmark（M12 范围外）
+- [x] 添加 Ring Buffer/Session 性能 benchmark（M43）
 
 ### Logging
 
@@ -240,19 +228,17 @@
 - [x] 支持输出日志查看
 - [ ] 为 Session 日志增加兼容时间戳格式并实现 replay `--speed`
 - [ ] 使用事件通知实现 replay `--follow`，禁止 sleep polling
-- [ ] 为快速 `cd; exit` 设计跨 Shell cwd 退出状态 side channel
+- [x] 为快速 `cd; exit` 实现跨 Shell cwd 退出状态 side channel（M54）
 
 ### CLI
 
-- [ ] persist version
-- [ ] persist daemon start
-- [ ] persist daemon stop
-- [ ] persist daemon status
-- [ ] persist new
-- [ ] persist ls
-- [x] persist attach（M08：raw mode + poll 驱动 I/O）
+- [x] persist version
+- [x] persist daemon start
+- [x] persist daemon stop
+- [x] persist daemon status
 - [x] persist new（M10）
-- [x] persist ls（M10）
+- [x] persist ls（M10，M51 增加交互菜单）
+- [x] persist attach（M08：raw mode + poll 驱动 I/O）
 - [x] persist close（M10）
 - [x] persist kill（M10）
 - [x] persist detach
@@ -285,7 +271,7 @@
 - [x] persist doctor
 - [x] 检查 socket 权限
 - [x] 检查 daemon 状态
-- [ ] 检查 profile 注入
+- [x] 检查 profile 注入（doctor shell hook 检查）
 - [x] 检查日志目录权限
 - [ ] 检查 metadata 权限
 - [x] 输出修复建议
@@ -296,12 +282,12 @@
 - [x] PTY 集成测试（echo/pipe/多命令/重定向/zsh/fish）
 - [x] CLI 集成测试（daemon-required 命令连接错误输出）
 - [x] Daemon IPC 集成测试（note/tag 完整流程）
-- [ ] Signal 集成测试（M22）
-- [ ] SSH 接管测试
+- [x] Signal 集成测试（M22：SIGINT/SIGTSTP）
+- [ ] 真实 SSH 登录的 shell hook 接管端到端测试
 - [x] 大输出测试（M21）
 - [x] 多 Session 测试（M21）
 - [x] 频繁 attach/detach 测试（M21）
-- [ ] 断线恢复测试
+- [ ] client 异常断线后重新 attach 的专项集成测试
 - [ ] vim/top/less 兼容测试
 
 ---
@@ -319,7 +305,7 @@
 - [x] Independent history
 - [x] Idle detection
 - [x] Idle GC
-- [ ] Better list output
+- [x] Better list output（M19/M51）
 - [x] Better doctor
 - [x] Replay mode
 - [x] Shell completion（M48：bash/zsh/fish、包接入和定向验证）
@@ -365,3 +351,25 @@
 - [x] M51：`persist ls` 支持 TTY 交互选择和 `persist ls <id>` 菜单
 - [x] M51：bash/zsh/fish 实时命令历史，不修改用户 dotfile 或覆盖已有 hook
 - [x] M51：命令历史最新优先分页、0600 权限及 10,000 条/4 MiB 上限
+- [x] M53：确认单一 per-user PTY Holder 中文设计与 ADR
+- [x] M53：定义有界 holder 私有协议消息、状态模型和编解码边界
+- [x] M53：实现 `persist-holder` 安全目录、单实例、peer claim 和显式关闭生命周期
+- [x] M53：实现 `persist-holder` epoll 数据平面
+- [x] M53：实现 daemon Holder 启动、控制握手、串行请求和只读 inventory cache
+- [x] M53：迁移 PTY、Ring Buffer 和 Session 输出日志所有权
+- [x] M53：实现 daemon 崩溃后重连、inventory 和 metadata 对账
+- [x] M53：完成 Dashboard、日志、diagnostics 和生产 PTY 所有权收尾
+- [x] M53：完成 CLI Holder diagnostics、固定路径打包和旧架构升级边界
+- [x] M53：完成故障注入、100/500/1000 Session、平台包和 test 主机验证
+- [x] M54：实现最终 cwd Shell 状态 side channel
+- [x] M55：确认安全动态环境恢复中文设计与 ADR
+- [x] M55：确认八阶段 TDD 实施计划
+- [x] M55：完成共享环境策略、配置与 envelope v2
+- [x] M55：完成隐藏 helper 动态环境采集
+- [x] M55：完成 Public Attach 当前连接上下文
+- [x] M55：完成 PTY 结构化 set/unset 启动环境
+- [x] M55：完成 Holder capability 与退出环境上下文
+- [x] M55：完成 Daemon metadata-first 动态环境恢复
+- [x] M55：完成跨 Shell、兼容、故障和安全验证
+- [x] M55：实现安全的 Closed Session 动态环境恢复
+- [ ] M56：实现时间化日志、replay `--speed` 和事件驱动 `--follow`

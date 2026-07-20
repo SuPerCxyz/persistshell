@@ -9,8 +9,10 @@ persistd \- run the PersistShell per-user daemon
 .RI [ --idle-timeout " " DURATION ]
 .SH DESCRIPTION
 .B persistd
-owns the per-user Unix socket, PTY sessions, session metadata, ring buffers,
-and output logs.  Normally it is started by \fBpersist daemon start\fR.
+owns the per-user public Unix socket, session metadata, reconciliation, and
+client coordination.  A single per-user \fBpersist-holder\fR owns PTY masters,
+bounded replay buffers, and session output writers.  Normally both are managed
+through \fBpersist daemon start\fR.
 Run it directly only for foreground operation and diagnostics.
 .SH COMMANDS
 .TP
@@ -32,6 +34,9 @@ and listens on
 .IR /run/user/$UID/persistshell/persist.sock
 by default.  It uses the same configuration and XDG directory resolution as
 .BR persist (1).
+Release builds start the internal Holder only from
+.IR /usr/libexec/persistshell/persist-holder ;
+they do not resolve it through \fBPATH\fR or \fBPERSIST_HOLDER_PATH\fR.
 .SH SIGNALS
 .B SIGTERM
 requests a graceful shutdown.  The daemon removes its socket and PID file
@@ -49,6 +54,9 @@ Session output logs by default.
 .TP
 .I ~/.local/state/persistshell/daemon.log
 Daemon log by default.
+.TP
+.I /usr/libexec/persistshell/persist-holder
+Fixed release installation path for the internal per-user PTY Holder.
 .SH EXIT STATUS
 Zero indicates success.  Invalid arguments and daemon startup or runtime
 errors exit with status 2.

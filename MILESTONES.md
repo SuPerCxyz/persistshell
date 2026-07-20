@@ -108,6 +108,10 @@
 | M50 | v0.1.0 Release | ☑ 已完成 | tag、平台 workflow、artifact 与 test 部署已验证；GitHub Release、签名和 SBOM 暂缓 |
 | M51 | 交互式命令历史与完整用户手册 | ☑ 已完成 | `persist ls` 交互选择、实时命令历史和单文件完整用户手册 |
 | M52 | Performance dashboard | ☑ 已完成 | 有界采样、24h 趋势、Ratatui TUI、性能和平台验证完成 |
+| M53 | Daemon 崩溃可恢复 PTY Holder | ☑ 已完成 | 九阶段实现、故障注入、平台包、性能和 Rocky test 验证完成 |
+| M54 | 最终 Shell 状态 Side Channel | ☑ 已完成 | 最终 cwd、离线退出、崩溃对账、双平台包和 Rocky test 验证完成 |
+| M55 | Closed Session 动态环境恢复 | ☑ 已完成 | 动态 set/unset、兼容、安全、双平台包和 Rocky 验证完成 |
+| M56 | 时间化日志与完整 Replay | ☐ 未开始 | 兼容日志格式、`--speed` 和事件驱动 `--follow` |
 
 ---
 

@@ -10,6 +10,86 @@
 
 ### Added
 
+- 确认 M55 安全动态环境恢复设计与 ADR：采用内置白名单加用户扩展、不可绕过敏感禁区、
+  精确 unset、当前连接变量优先、state helper 原子提交和 Holder capability 降级。
+- 确认 M55 八阶段 TDD 实施计划，按共享策略、helper、public attach、PTY unset、
+  Holder 兼容、metadata-first、故障安全和平台收尾顺序推进。
+- 完成 M55 阶段 1：新增恢复环境配置、共享 allowlist/硬禁区策略、确定性 fingerprint、
+  精确 set/unset snapshot、legacy v1/envelope v2 严格兼容和 72 KiB 私有原子状态边界。
+- 完成 M55 阶段 2：隐藏 helper 使用继承环境和共享策略采集动态 exported environment，
+  支持精确 unset、可信快照保留和 unavailable 降级，并保持三种 Shell 的 M54 hook 契约。
+- 完成 M55 阶段 3：public protocol `0.2` 为 Attach 增加有界当前连接上下文，保留 legacy
+  4-byte 兼容，并对固定 allowlist、agent socket 和请求级不持久化边界执行双重校验。
+- 完成 M55 阶段 4：共享结构化 PTY 启动环境区分 saved set/unset、connection 和 private，
+  fork 前统一验证，child 执行真实 unset；Holder Create 提供 minor 1 降级和 v2 精确 codec。
+- 完成 M55 阶段 5：Holder 使用 minor 1 基线握手和 minor 2 capability 协商；新协议保留
+  envelope v2 退出环境，旧 Holder 探测断线后由 daemon 以同 instance 降级重连且 runtime
+  持续运行，legacy SessionExited/GetExitContext 保持 cwd-only wire。
+- 完成 M55 阶段 6：`env_snapshot` 保持 schema v7，独立 codec 兼容 legacy map 并只写
+  确定性 v2；在线/周期/启动退出均先提交环境再 retire，Closed attach 已通过真实 PTY
+  set、恢复、unset 和再次恢复验证。
+- 完成 M55 阶段 7-8：跨客户端连接覆盖、敏感值泄漏、故障窗口和三 Shell 验证通过；
+  增加原子提交/恢复性能采样、Ubuntu tar/deb、Rocky tar/RPM 与隔离安装验证，证据记录于
+  `docs/audit/2026-07-20-m55-dynamic-environment-recovery-validation.md`。
+- 确认 M54 最终 Shell cwd side channel 设计与 ADR：bash/zsh/fish 通过私有原子 JSON 状态
+  文件提交 cwd，Holder 在 daemon 离线期间保留退出上下文，metadata 成功后才 retire runtime。
+- 完成 M54 七阶段实施计划，覆盖安全文件 I/O、Holder 协议、用户 hook 兼容、崩溃对账、
+  性能、Ubuntu 26.04/RHEL 9 包和 Rocky test 验证；动态环境恢复明确留给 M55。
+- 完成 M54 阶段 1 共享 Shell 状态基础：新增严格 JSON envelope、128-bit runtime identity、
+  private `session-state` 目录、dirfd 原子替换、`O_NOFOLLOW` 安全读取和受限清理。
+- 完成 M54 阶段 2 Holder 退出上下文协议：minor 1 新增状态身份、最终 cwd、离线查询和
+  metadata-first retire wire contract，并通过完整 `persist-ipc` 门禁。
+- 完成 M54 阶段 3 Holder runtime：退出后安全读取并保留最终 cwd，支持离线重连查询和显式
+  retire；状态缺失、损坏、身份错误或 symlink 均降级为仅保留真实 exit code。
+- 完成 M54 阶段 4 隐藏 state helper 与 Bash/Zsh/Fish 私有 hook：实时提交 cwd，不修改用户
+  rc，不替换已有 EXIT trap、prompt、precmd/postexec 或 history filter。
+- 完成 M54 阶段 5 metadata-first 对账：在线/离线退出先保存 exit code/cwd 再 retire，
+  两个 crash window 均可幂等恢复，`/proc` cwd 回退和既有 env 白名单快照保持兼容。
+- 完成 M54 最终门禁：正常 `exit`、空行 `Ctrl+D`、快速 `cd; exit`、daemon 离线退出、
+  Bash 用户 trap 保护和显式清理通过真实 PTY 测试；Ubuntu 26.04 tar/deb、RHEL 9 tar/RPM
+  与 Rocky 9.7 安装验证均通过，证据记录于 M54 审计文档。
+- 新增 13 个 Shell 状态测试，覆盖身份、版本、sequence、cwd/文件容量、owner/mode、特殊权限
+  位、symlink、非普通文件、原子替换和失败保留；`umask 000` 下仍保持 `0700`/`0600`。
+- 确认 M53 单一 per-user `persist-holder` 设计与 ADR，规定 daemon 崩溃期间持续持有并排空 PTY、
+  重启后进行有界 inventory 对账，以及显式 stop 与异常断开的严格生命周期边界。
+- 完成 M53 九阶段实施计划，按私有协议、安全生命周期、PTY 数据面、daemon 接管、metadata
+  对账、兼容迁移、打包和故障注入顺序推进。
+- 完成 M53 阶段 1 Holder 私有协议，新增独立 magic/版本/帧头、控制和数据握手、inventory、
+  Session 创建与操作事件模型，并拒绝截断、尾随、非法枚举、路径和超限 payload。
+- 完成 M53 阶段 2 `persist-holder` 安全生命周期，新增严格 `0700`/`0600` 路径、PID flock、
+  stale socket 证明、`SO_PEERCRED` claim、signalfd 退出和控制断线重连；修复旧控制 EOF 与新
+  claim 同时发生时错误返回 Busy 的竞态。
+- 完成 M53 阶段 3 Holder PTY 数据面：单一 epoll reactor 管理控制/data socket、PTY、signalfd
+  和日志 eventfd；支持 Create/Inventory/Close/Kill、读写/只读 attach、takeover、resize、signal、
+  exit 和离线 Ring replay，并以有界队列隔离慢客户端及单线程轮转日志。
+- 完成 M53 阶段 4 daemon Holder 控制客户端：可信路径自动启动、inotify/pidfd 有界等待、严格
+  instance/nonce/request/generation 校验、串行请求、异步事件队列和只读 inventory cache；真实
+  测试证明 daemon SIGKILL 后 Holder 保活并可由第二 daemon 接管。
+- 完成 M53 阶段 5 Session/public attach 迁移：生产 daemon 不再持有 PTY master、Ring Buffer 或
+  Session 日志 writer；现有 public IPC 支持 Holder 读写/只读 attach、takeover、resize、signal、
+  Close/Kill、退出和 closed restore，查询与 Dashboard 合并 inventory 和 metadata。
+- 新增真实 PTY 崩溃接管测试：命令输入到 Holder 后 `SIGKILL` daemon，Shell 继续执行并输出，
+  第二 daemon 接管同一 Holder 后通过只读 attach replay 读取该输出。
+- 完成 M53 阶段 6 崩溃重连与 metadata 对账：schema v7 记录 Holder instance/generation，启动在
+  public socket 前对 running/exited/missing/orphan 做稳定快照和幂等恢复，运行期周期刷新。
+- 新增 debug-only 崩溃注入集成测试，覆盖 create、metadata commit、Shell exit 和 reconcile；
+  验证 `lost`、orphan attach 拒绝、离线退出码与日志、重复重启和 Session ID 单调性。
+- 修复 Holder 前置启动时 runtime 目录尚未收紧为 `0700`、Holder 日志目录未创建，以及离线退出
+  Session 清退错误等待历史退出事件的问题。
+- 完成 M53 阶段 7 兼容收尾：Dashboard runtime/writer 统计改以 Holder inventory 为准，Session
+  Snapshot/Metrics 和 `persist doctor` 可见日志 degraded 与 `lost` 状态。
+- Holder 进程由 pidfd 检测；异常退出后 daemon 清空旧 inventory、将活动 Session 标记 `lost`、
+  拒绝 attach 并继续提供只读 metadata 操作，正常停止不再向已退出 Holder 发送关闭请求。
+- production `persistd` 不再编译 legacy PTY I/O loop、Ring Buffer 或 Session logger；真实测试新增
+  日志 symlink 降级、Holder SIGKILL、Idle GC 及 pinned/locked 豁免覆盖。
+- 完成 M53 阶段 8 CLI、打包与升级边界：daemon status/doctor 展示 Holder PID、instance、连接、
+  degraded/lost；tar/deb/RPM 安装固定路径 `persist-holder`，release 禁止 PATH/环境覆盖。
+- 明确旧架构 running metadata 缺少 Holder 时标记 `lost` 且不伪造热迁移；普通包卸载保留用户
+  metadata、历史和日志，并同步完整用户手册、安装、排障、man page 和 GitHub Package workflow。
+- 完成 M53 阶段 9 故障、性能和平台验证：新增统一 recovery fault suite 和协议级 attach
+  benchmark，覆盖 daemon/Holder SIGKILL、离线 1 MiB 输出、重连、takeover、resize 和 signal。
+- Ubuntu 26.04 tar/deb 与 RHEL 9 tar/RPM 原生构建通过，三个 RHEL 9 二进制最高 GLIBC 2.34；
+  Rocky test 完成最终 RPM、100/500/1000 Session、卸载保留日志和显式 stop 验证。
 - 完成 M52 Performance dashboard 设计与 ADR，确定 `persist top`、Daemon 有界采样 worker、
   1 小时内存趋势、24 小时磁盘聚合及严格资源和隐私边界。
 - 新增 Dashboard summary/trend 二进制 IPC，限制每页 128 个 Session、每次 240 个趋势点，并
@@ -40,6 +120,14 @@
 
 ### Fixed
 
+- 修复 `persist doctor` 将安全创建的 `0700` data/state 目录误报为应为 `0755` 的问题。
+- 修复 CLI 非阻塞读取将 `EAGAIN` 当 EOF，以及 0x0 terminal resize 被转成非法 Holder 帧后
+  断开 data socket的问题；异常/自动化终端现在可正常输入并以 `exit` 释放 runtime。
+- 修复 Metrics/Dashboard 在 Holder inventory 刷新间隔内漏报当前 public active writer。
+- 修复 Holder 在 `EPOLLIN|EPOLLRDHUP` 同时到达时丢弃最后输入帧，以及 raw fd 快速复用导致旧
+  epoll 事件错误关闭新连接的问题；每次注册现使用唯一 token，生命周期并行压力 80 轮通过。
+- 清理 `TODO.md` 的历史未同步状态和重复条目，将 daemon、PTY、Session、CLI、诊断及测试中
+  已有实现的项目同步为完成，并明确保留真实功能缺口与暂缓项。
 - 修复从 `persist ls <id>` 菜单 attach 返回后 stdin 保留 `O_NONBLOCK`、导致菜单读取
   `EAGAIN` 的问题；文件状态 flags 现在由 RAII 守卫恢复。
 - zsh/fish 检测到自定义 history 过滤器时优先保留用户配置并明确降级，不重复调用或绕过过滤

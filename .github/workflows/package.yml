@@ -38,7 +38,9 @@ jobs:
           set -euo pipefail
           (cd dist && sha256sum --check *.sha256)
           tar -tzf dist/*ubuntu-26.04*.tar.gz | grep '/bin/persistd$'
+          tar -tzf dist/*ubuntu-26.04*.tar.gz | grep '/libexec/persistshell/persist-holder$'
           dpkg-deb --contents dist/*.deb | grep '/usr/bin/persistd$'
+          dpkg-deb --contents dist/*.deb | grep '/usr/libexec/persistshell/persist-holder$'
           target/release/persist --version
           target/release/persistd --version
 
@@ -78,12 +80,13 @@ jobs:
       - name: Check RHEL 9 ABI
         run: |
           set -euo pipefail
-          for binary in target/release/persist target/release/persistd; do
+          for binary in target/release/persist target/release/persistd target/release/persist-holder; do
             max_glibc=$(objdump -T "$binary" | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -n 1 | cut -d_ -f2)
             test -n "$max_glibc"
             test "$(printf '%s\n' "$max_glibc" 2.34 | sort -V | tail -n 1)" = 2.34
-            "$binary" --version
           done
+          target/release/persist --version
+          target/release/persistd --version
 
       - name: Create packages
         run: scripts/package-release.sh tarball rpm
@@ -93,7 +96,9 @@ jobs:
           set -euo pipefail
           (cd dist && sha256sum --check *.sha256)
           tar -tzf dist/*rhel9*.tar.gz | grep '/bin/persistd$'
+          tar -tzf dist/*rhel9*.tar.gz | grep '/libexec/persistshell/persist-holder$'
           rpm --query --package --list dist/*.el9.x86_64.rpm | grep '/usr/bin/persistd$'
+          rpm --query --package --list dist/*.el9.x86_64.rpm | grep '/usr/libexec/persistshell/persist-holder$'
 
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
