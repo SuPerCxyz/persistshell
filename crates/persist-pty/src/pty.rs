@@ -46,7 +46,7 @@ fn unlock_pt(fd: RawFd) -> Result<()> {
 }
 
 fn pts_name(master_fd: RawFd) -> Result<PathBuf> {
-    let mut buf = [0i8; 4096];
+    let mut buf = [0 as libc::c_char; 4096];
     let result = unsafe { libc::ptsname_r(master_fd, buf.as_mut_ptr(), buf.len()) };
     if result != 0 {
         return Err(PersistError::Io {
@@ -98,18 +98,10 @@ pub fn detect_shell() -> String {
 fn shell_from_passwd() -> Option<String> {
     let uid = unsafe { libc::getuid() };
     let mut pwd: libc::passwd = unsafe { std::mem::zeroed() };
-    let mut buf = vec![0u8; 16384];
+    let mut buf = vec![0 as libc::c_char; 16384];
     let mut result: *mut libc::passwd = std::ptr::null_mut();
 
-    let ret = unsafe {
-        libc::getpwuid_r(
-            uid,
-            &mut pwd,
-            buf.as_mut_ptr() as *mut i8,
-            buf.len(),
-            &mut result,
-        )
-    };
+    let ret = unsafe { libc::getpwuid_r(uid, &mut pwd, buf.as_mut_ptr(), buf.len(), &mut result) };
 
     if ret != 0 || result.is_null() || pwd.pw_shell.is_null() {
         return None;
