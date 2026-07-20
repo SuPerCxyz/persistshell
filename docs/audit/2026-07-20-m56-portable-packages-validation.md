@@ -2,7 +2,7 @@
 
 日期：2026-07-20
 
-状态：本地 x86_64 完成，ARM64 GitHub 原生验证待执行
+状态：完成
 
 ## 实现范围
 
@@ -60,6 +60,37 @@ Session new/list/close 和清理：
 `actionlint` 通过。workflow 使用 `ubuntu-24.04-arm` 原生 runner，Rocky 8/10、Ubuntu
 22.04/26.04 和 Debian 11/13 镜像均确认存在 ARM64 manifest，不使用 QEMU 正式产物。
 
-当前改动尚未 commit/push，GitHub ARM64 workflow 未执行。因此 M56 保持进行中，不能把
-ARM64 构建、包体积和运行 smoke 记录为已通过。推送后必须检查全部 package jobs 和 artifacts，
-再更新本审计、TODO、MILESTONES、CHANGELOG 与 NEXT_TASK。
+GitHub Package workflow
+[`29733941624`](https://github.com/SuPerCxyz/persistshell/actions/runs/29733941624)
+最终通过 21 个 job：
+
+- x86_64 与 aarch64 原生构建、RPM 和通用 tar.xz。
+- amd64 与 arm64 DEB 构建。
+- Rocky 8/9/10、CentOS Stream 9/10 RPM 安装和 Session smoke。
+- Ubuntu 22.04/24.04/26.04、Debian 11/12/13 DEB 安装和 Session smoke。
+
+ARM 原生门禁发现并修复了 `libc::c_char` 在 aarch64 为 `u8` 的可移植性问题。旧版
+Debian/Ubuntu 容器还发现默认 `sh` 不支持 `pipefail`，DEB smoke 已显式使用 Bash。
+CentOS Stream 9 首次运行在 Holder 启动读取处出现一次 EAGAIN，原样重跑通过；其余
+20 个 job 首次通过。
+
+## 最终产物
+
+| 产物 | x86_64/amd64 | aarch64/arm64 |
+|---|---:|---:|
+| `persist` | 1,263,632 bytes | 1,123,080 bytes |
+| `persistd` | 2,290,696 bytes | 2,186,216 bytes |
+| `persist-holder` | 874,200 bytes | 795,216 bytes |
+| RPM | 1,396,268 bytes | 1,348,044 bytes |
+| DEB | 1,385,548 bytes | 1,337,928 bytes |
+| tar.xz | 1,389,520 bytes | 1,340,236 bytes |
+
+两种架构 ELF 的最高 symbol 均为 GLIBC_2.28。下载后的 6 个正式包 checksum 全部通过，
+RPM metadata 分别为 x86_64/aarch64，DEB metadata 分别为 amd64/arm64，所有包均低于
+体积门禁。
+
+## CI 回归
+
+普通 CI 连续暴露 `proven_stale_socket_is_replaced` 对已删除 socket inode 立即复用的错误
+假设。等待判据改为设备号、inode 和纳秒 ctime 组成的身份；定向用例连续 20 次及完整
+Holder lifecycle 通过。该修改只影响测试判据，不放宽生产 stale socket 检查。

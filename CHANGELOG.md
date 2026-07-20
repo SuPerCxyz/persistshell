@@ -15,8 +15,11 @@
 - 完成 M56 通用打包实现：每架构单次构建，RPM/DEB/tar.xz 使用通用命名，release 启用
   LTO/strip，包体积约 1.4 MiB，并由 3/3.5 MiB 硬门禁限制。
 - 新增无 pidfd 内核 fallback，使用 PID、procfs start time 和 zombie 状态验证进程身份；
-  x86_64 EL8 ABI 及 Rocky/CentOS Stream、Ubuntu/Debian 安装和 Session smoke 已通过，
-  ARM64 原生 Actions 验证仍待推送后执行。
+  x86_64/aarch64 ELF 均保持 GLIBC_2.28，GitHub 原生双架构构建和 17 组
+  Rocky/CentOS Stream、Ubuntu/Debian 安装与 Session smoke 已通过。
+- 修复 aarch64 的 `libc::c_char` 符号类型编译错误、旧版 DEB 容器的 Bash 执行约束，
+  以及 stale socket 测试仅依赖 inode 导致的文件系统复用误判；正式 RPM、DEB 和
+  tar.xz 均约 1.3 MiB，证据记录于 M56 审计文档。
 - 确认 M55 安全动态环境恢复设计与 ADR：采用内置白名单加用户扩展、不可绕过敏感禁区、
   精确 unset、当前连接变量优先、state helper 原子提交和 Holder capability 降级。
 - 确认 M55 八阶段 TDD 实施计划，按共享策略、helper、public attach、PTY unset、

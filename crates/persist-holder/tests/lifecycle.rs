@@ -23,7 +23,7 @@ impl HolderProcess {
         std::fs::create_dir_all(&home).expect("create home");
         std::fs::create_dir_all(&runtime).expect("create runtime");
         let socket_path = runtime.join("persistshell/holder.sock");
-        let previous_inode = std::fs::metadata(&socket_path).ok().map(|meta| meta.ino());
+        let previous_identity = socket_identity(&socket_path);
         let child = holder_command(root)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -35,7 +35,7 @@ impl HolderProcess {
             socket_path,
             runtime_dir,
         };
-        wait_for_socket(&process.socket_path, &mut process.child, previous_inode);
+        wait_for_socket(&process.socket_path, &mut process.child, previous_identity);
         process
     }
 
@@ -252,12 +252,20 @@ fn prepare_root(root: &Path) {
     std::fs::create_dir_all(root.join("runtime")).expect("create runtime");
 }
 
-fn wait_for_socket(path: &Path, child: &mut Child, previous_inode: Option<u64>) {
+type SocketIdentity = (u64, u64, i64, i64);
+
+fn socket_identity(path: &Path) -> Option<SocketIdentity> {
+    std::fs::metadata(path)
+        .ok()
+        .map(|meta| (meta.dev(), meta.ino(), meta.ctime(), meta.ctime_nsec()))
+}
+
+fn wait_for_socket(path: &Path, child: &mut Child, previous_identity: Option<SocketIdentity>) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
         assert!(child.try_wait().expect("holder status").is_none());
-        let current_inode = std::fs::metadata(path).ok().map(|meta| meta.ino());
-        if current_inode.is_some() && current_inode != previous_inode {
+        let current_identity = socket_identity(path);
+        if current_identity.is_some() && current_identity != previous_identity {
             return;
         }
         std::thread::sleep(Duration::from_millis(20));
