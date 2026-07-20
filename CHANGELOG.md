@@ -10,6 +10,13 @@
 
 ### Added
 
+- 确认 M56 通用 Linux 多架构发布包设计与 ADR：采用 glibc 2.28 单一 ABI、x86_64/
+  ARM64 原生构建、通用 RPM/DEB/tar.xz、包体积硬门禁和旧内核 pidfd fallback。
+- 完成 M56 通用打包实现：每架构单次构建，RPM/DEB/tar.xz 使用通用命名，release 启用
+  LTO/strip，包体积约 1.4 MiB，并由 3/3.5 MiB 硬门禁限制。
+- 新增无 pidfd 内核 fallback，使用 PID、procfs start time 和 zombie 状态验证进程身份；
+  x86_64 EL8 ABI 及 Rocky/CentOS Stream、Ubuntu/Debian 安装和 Session smoke 已通过，
+  ARM64 原生 Actions 验证仍待推送后执行。
 - 确认 M55 安全动态环境恢复设计与 ADR：采用内置白名单加用户扩展、不可绕过敏感禁区、
   精确 unset、当前连接变量优先、state helper 原子提交和 Holder capability 降级。
 - 确认 M55 八阶段 TDD 实施计划，按共享策略、helper、public attach、PTY unset、

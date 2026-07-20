@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use persist_core::{PersistError, Result};
 
 use super::client::HolderControlClient;
+use super::process_watch::{ProcessExit, TimerFd, FALLBACK_TICK};
 
 const INSTALLED_HOLDER: &str = "/usr/libexec/persistshell/persist-holder";
 const START_TIMEOUT: Duration = Duration::from_secs(3);
@@ -68,7 +69,7 @@ pub(crate) fn connect_or_start(
         .stderr(holder_stderr)
         .spawn()
         .map_err(|source| io_error("start persist-holder", source))?;
-    let pid_fd = PidFd::open(child.id())?;
+    let process_exit = ProcessExit::watch(child.id())?;
     let deadline = Instant::now() + START_TIMEOUT;
     loop {
         if let Ok(client) = HolderControlClient::connect(socket_path) {
@@ -88,50 +89,7 @@ pub(crate) fn connect_or_start(
                 "timed out waiting for persist-holder socket",
             ));
         }
-        watcher.wait(&pid_fd, deadline.saturating_duration_since(now))?;
-    }
-}
-
-pub(super) struct ProcessExit {
-    pid_fd: PidFd,
-}
-
-impl ProcessExit {
-    pub(super) fn watch(pid: u32) -> Result<Self> {
-        Ok(Self {
-            pid_fd: PidFd::open(pid)?,
-        })
-    }
-
-    pub(super) fn has_exited(&self) -> Result<bool> {
-        let mut pollfd = libc::pollfd {
-            fd: self.pid_fd.fd,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        let ready = unsafe { libc::poll(&mut pollfd, 1, 0) };
-        if ready < 0 {
-            return Err(io_error(
-                "inspect persist-holder process",
-                std::io::Error::last_os_error(),
-            ));
-        }
-        Ok(ready > 0)
-    }
-
-    pub(super) fn wait(&self) -> Result<()> {
-        let mut pollfd = libc::pollfd {
-            fd: self.pid_fd.fd,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        let ready = unsafe { libc::poll(&mut pollfd, 1, START_TIMEOUT.as_millis() as i32) };
-        if ready <= 0 {
-            return Err(PersistError::internal_error(
-                "persist-holder did not exit after ShutdownAll",
-            ));
-        }
-        Ok(())
+        watcher.wait(&process_exit, deadline.saturating_duration_since(now))?;
     }
 }
 
@@ -203,19 +161,27 @@ impl StartupWatcher {
         Ok(Self { fd })
     }
 
-    fn wait(&self, pid_fd: &PidFd, timeout: Duration) -> Result<()> {
-        let mut fds = [
-            libc::pollfd {
-                fd: self.fd,
+    fn wait(&self, process_exit: &ProcessExit, timeout: Duration) -> Result<()> {
+        let timer = if process_exit.poll_fd().is_none() {
+            Some(TimerFd::one_shot(timeout.min(FALLBACK_TICK))?)
+        } else {
+            None
+        };
+        let mut fds = vec![libc::pollfd {
+            fd: self.fd,
+            events: libc::POLLIN,
+            revents: 0,
+        }];
+        if let Some(fd) = process_exit
+            .poll_fd()
+            .or_else(|| timer.as_ref().map(TimerFd::fd))
+        {
+            fds.push(libc::pollfd {
+                fd,
                 events: libc::POLLIN,
                 revents: 0,
-            },
-            libc::pollfd {
-                fd: pid_fd.fd,
-                events: libc::POLLIN,
-                revents: 0,
-            },
-        ];
+            });
+        }
         let millis = timeout.as_millis().min(i32::MAX as u128) as i32;
         let ready = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as _, millis) };
         if ready < 0 && std::io::Error::last_os_error().kind() != std::io::ErrorKind::Interrupted {
@@ -233,29 +199,6 @@ impl StartupWatcher {
 }
 
 impl Drop for StartupWatcher {
-    fn drop(&mut self) {
-        unsafe { libc::close(self.fd) };
-    }
-}
-
-struct PidFd {
-    fd: RawFd,
-}
-
-impl PidFd {
-    fn open(pid: u32) -> Result<Self> {
-        let fd = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) as RawFd };
-        if fd < 0 {
-            return Err(io_error(
-                "open persist-holder pidfd",
-                std::io::Error::last_os_error(),
-            ));
-        }
-        Ok(Self { fd })
-    }
-}
-
-impl Drop for PidFd {
     fn drop(&mut self) {
         unsafe { libc::close(self.fd) };
     }

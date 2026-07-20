@@ -6,6 +6,15 @@
 
 ## Phase 1 限制
 
+### 发布平台边界
+
+正式包仅支持 Linux x86_64 和 ARM64、glibc 2.28 或更高。当前不提供 i686、ARMv7、
+musl/Alpine、EL7 或 macOS 包。
+
+Rocky Linux、CentOS Stream、Ubuntu 和 Debian 由公开 CI 镜像验证。RHEL 与 AlmaLinux
+按 EL8/9/10 ABI compatible 提供，不代表对应厂商认证。容器验证共享 runner 内核，因此
+旧内核 pidfd fallback 主要由强制 procfs 路径测试覆盖。
+
 ### 不支持 Pane / Window
 
 PersistShell 不支持：

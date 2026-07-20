@@ -44,7 +44,8 @@
   作为 RHEL 9 兼容产物发布。
 - `master` 已改为 Ubuntu 26.04 与 RHEL 9 独立构建；Package run `29464594020` 和下载产物复核
   均通过，两个 artifact digest 已记录在 M50 平台包审计中。
-- 已验证 Linux x86_64 的 Ubuntu 与 Rocky 基线，未验证其他架构、发行版或 macOS。
+- M56 前仅验证 Linux x86_64 的 Ubuntu 与 Rocky 基线；M56 通用包完成后以对应审计中的
+  x86_64/ARM64 和多发行版矩阵为准，macOS 仍不支持。
 - test 主机没有 zsh/fish 端到端交互环境；相应补全已作语法和打包路径验证。
 - daemon 崩溃后的 PTY 存活、所有全屏 TUI 的画面恢复不属于当前承诺。
 - 当前 workflow 上传 artifact，但不自动创建 GitHub Release，也不执行签名。

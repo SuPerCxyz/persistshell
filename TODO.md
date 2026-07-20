@@ -372,4 +372,10 @@
 - [x] M55：完成 Daemon metadata-first 动态环境恢复
 - [x] M55：完成跨 Shell、兼容、故障和安全验证
 - [x] M55：实现安全的 Closed Session 动态环境恢复
-- [ ] M56：实现时间化日志、replay `--speed` 和事件驱动 `--follow`
+- [x] M56：确认通用 Linux 多架构发布包设计与 ADR
+- [x] M56：实现 glibc 2.28 的 x86_64/ARM64 单次构建
+- [x] M56：生成通用 RPM、DEB、tar.xz 与 checksum
+- [x] M56：实现 release 体积优化和包体积硬门禁
+- [x] M56：实现不支持 pidfd 内核的进程身份 fallback
+- [ ] M56：完成双架构、多发行版安装和运行验证
+- [ ] M57：实现时间化日志、replay `--speed` 和事件驱动 `--follow`

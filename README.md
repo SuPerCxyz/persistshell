@@ -285,6 +285,8 @@ GitHub Actions 必须支持：
 - Rust fmt / clippy / test。
 - Linux release tarball 构建。
 - Debian `.deb` 和 RPM `.rpm` 包构建。
+- x86_64/ARM64 原生构建、glibc 2.28 ABI 和包体积门禁。
+- Rocky/CentOS Stream、Ubuntu/Debian 安装与 Session smoke。
 - release artifact 上传。
 - SHA256 checksum 生成。
 
@@ -384,8 +386,8 @@ PersistShell 必须遵守最小权限原则。
 
 PersistShell 已有可运行的 Rust CLI、per-user daemon、PTY Session、SQLite metadata、日志、
 Closed Session 恢复、单 active writer、观察命令、man page、bash/zsh/fish completion 以及
-tarball/deb/rpm 打包入口。验证记录位于 `docs/audit/`；当前已知限制位于
-`docs/known/`。
+x86_64/ARM64 通用 tar.xz/deb/rpm 打包入口。验证记录位于 `docs/audit/`；当前已知限制
+位于 `docs/known/`。
 
 开发或自动化 Agent 的阅读入口为 `docs/INDEX.md`，当前唯一开发任务以 `NEXT_TASK.md` 为准。
 

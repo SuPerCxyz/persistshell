@@ -42,6 +42,25 @@ test -x /usr/libexec/persistshell/persist-holder
 不要直接运行 `persist-holder`。release 版 `persistd` 不通过 `PATH` 查找 Holder；源码 debug
 构建才允许使用同构建目录的二进制或 `PERSIST_HOLDER_PATH` 进行开发测试。
 
+根据系统和 CPU 架构安装对应的通用包：
+
+```bash
+# Debian/Ubuntu x86_64
+sudo apt install ./persistshell_0.1.0_amd64.deb
+
+# Debian/Ubuntu ARM64
+sudo apt install ./persistshell_0.1.0_arm64.deb
+
+# RHEL/Rocky/AlmaLinux x86_64
+sudo dnf install ./persistshell-0.1.0-1.x86_64.rpm
+
+# RHEL/Rocky/AlmaLinux ARM64
+sudo dnf install ./persistshell-0.1.0-1.aarch64.rpm
+```
+
+正式包要求 glibc 2.28 或更高。支持 Ubuntu 22.04/24.04/26.04、Debian 11/12/13 和
+EL8/9/10 兼容发行版；不支持 EL7、32 位 x86、ARMv7 或 Alpine/musl。
+
 启动当前用户 daemon：
 
 ```bash
@@ -562,7 +581,7 @@ persist uninstall [--purge]               移除 hook 和可选数据
 
 ## 21. 当前支持边界
 
-- 仅支持 Linux x86_64 的已验证发行包基线。
+- 发布包支持 Linux x86_64 和 ARM64，要求 glibc 2.28 或更高。
 - bash、zsh、fish 需要分别通过实时 history 兼容验证；自定义复杂插件可能触发安全降级。
 - 不提供 pane、window、layout、Web UI 或多人共享权限模型。
 - daemon 崩溃后的 PTY 存活和全部 TUI 画面恢复尚未承诺。

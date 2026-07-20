@@ -35,17 +35,33 @@ ssh node
 
 ## 安装方式
 
-Debian/Ubuntu：
+Debian/Ubuntu x86_64：
 
 ```bash
 sudo apt install ./persistshell_0.1.0_amd64.deb
 ```
 
-RHEL/Rocky Linux 9：
+Debian/Ubuntu ARM64：
 
 ```bash
-sudo dnf install ./persistshell-0.1.0-1.el9.x86_64.rpm
+sudo apt install ./persistshell_0.1.0_arm64.deb
 ```
+
+RHEL/Rocky/AlmaLinux x86_64：
+
+```bash
+sudo dnf install ./persistshell-0.1.0-1.x86_64.rpm
+```
+
+RHEL/Rocky/AlmaLinux ARM64：
+
+```bash
+sudo dnf install ./persistshell-0.1.0-1.aarch64.rpm
+```
+
+正式包要求 glibc 2.28 或更高。已验证 Ubuntu 22.04/24.04/26.04、Debian 11/12/13、
+Rocky Linux 8/9/10 和 CentOS Stream 9/10；RHEL/AlmaLinux 8/9/10 使用相同 EL ABI，
+但不代表厂商认证。不支持 EL7、32 位 x86、ARMv7 或 Alpine/musl。
 
 tarball 解压后必须保持布局，并将内部组件安装到固定路径：
 

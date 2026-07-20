@@ -13,99 +13,270 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  ubuntu-2604:
-    name: Ubuntu 26.04 packages
-    runs-on: ubuntu-26.04
+  build-rpm:
+    name: Build ${{ matrix.rpm_arch }} binaries and RPM
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            rpm_arch: x86_64
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            rpm_arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    container: rockylinux/rockylinux:8
     env:
-      PERSIST_PACKAGE_PLATFORM: ubuntu-26.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install Rust toolchain
-        run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-
-      - name: Build release binaries
-        run: cargo build --release --workspace --locked
-
-      - name: Create packages
-        run: scripts/package-release.sh tarball deb
-
-      - name: Verify packages
-        run: |
-          set -euo pipefail
-          (cd dist && sha256sum --check *.sha256)
-          tar -tzf dist/*ubuntu-26.04*.tar.gz | grep '/bin/persistd$'
-          tar -tzf dist/*ubuntu-26.04*.tar.gz | grep '/libexec/persistshell/persist-holder$'
-          dpkg-deb --contents dist/*.deb | grep '/usr/bin/persistd$'
-          dpkg-deb --contents dist/*.deb | grep '/usr/libexec/persistshell/persist-holder$'
-          target/release/persist --version
-          target/release/persistd --version
-
-      - name: Upload package artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: persistshell-ubuntu-26.04-x86_64
-          path: |
-            dist/*.tar.gz
-            dist/*.deb
-            dist/*.sha256
-          if-no-files-found: error
-
-  rhel9:
-    name: RHEL 9 compatible packages
-    runs-on: ubuntu-26.04
-    container: rockylinux:9
-    env:
-      PERSIST_PACKAGE_PLATFORM: rhel9
-      PERSIST_PACKAGE_RPM_RELEASE: 1.el9
+      PERSIST_PACKAGE_TARGET: ${{ matrix.target }}
     steps:
       - name: Install build tools
-        run: dnf install --assumeyes binutils curl-minimal findutils gcc git gzip rpm-build tar
+        run: dnf install --assumeyes binutils curl findutils gcc git rpm-build tar xz
 
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --profile minimal --default-toolchain stable -y
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |
+            sh -s -- --profile minimal --default-toolchain stable -y
           echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
       - name: Build release binaries
         run: |
-          "$HOME/.cargo/bin/cargo" build --release --workspace --locked
+          "$HOME/.cargo/bin/cargo" build \
+            --release --workspace --locked --target "${{ matrix.target }}"
 
-      - name: Check RHEL 9 ABI
+      - name: Verify architecture and glibc baseline
+        run: scripts/check-linux-release.sh "${{ matrix.target }}"
+
+      - name: Create portable tarball and RPM
         run: |
-          set -euo pipefail
-          for binary in target/release/persist target/release/persistd target/release/persist-holder; do
-            max_glibc=$(objdump -T "$binary" | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail -n 1 | cut -d_ -f2)
-            test -n "$max_glibc"
-            test "$(printf '%s\n' "$max_glibc" 2.34 | sort -V | tail -n 1)" = 2.34
-          done
-          target/release/persist --version
-          target/release/persistd --version
+          scripts/package-release.sh tarball rpm
+          tar -cJf "portable-binaries-${{ matrix.rpm_arch }}.tar.xz" \
+            -C "target/${{ matrix.target }}/release" \
+            persist persistd persist-holder
 
-      - name: Create packages
-        run: scripts/package-release.sh tarball rpm
-
-      - name: Verify packages
+      - name: Verify RPM artifacts
         run: |
           set -euo pipefail
           (cd dist && sha256sum --check *.sha256)
-          tar -tzf dist/*rhel9*.tar.gz | grep '/bin/persistd$'
-          tar -tzf dist/*rhel9*.tar.gz | grep '/libexec/persistshell/persist-holder$'
-          rpm --query --package --list dist/*.el9.x86_64.rpm | grep '/usr/bin/persistd$'
-          rpm --query --package --list dist/*.el9.x86_64.rpm | grep '/usr/libexec/persistshell/persist-holder$'
+          tar -tJf dist/*.tar.xz | grep '/bin/persistd$'
+          tar -tJf dist/*.tar.xz | grep '/libexec/persistshell/persist-holder$'
+          rpm --query --package --list dist/*.rpm | grep '/usr/bin/persistd$'
+          rpm --query --package --list dist/*.rpm |
+            grep '/usr/libexec/persistshell/persist-holder$'
 
-      - name: Upload package artifacts
+      - name: Upload RPM artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: persistshell-rhel9-x86_64
+          name: persistshell-rpm-${{ matrix.rpm_arch }}
           path: |
-            dist/*.tar.gz
+            dist/*.tar.xz
             dist/*.rpm
             dist/*.sha256
           if-no-files-found: error
+
+      - name: Upload portable binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: persistshell-binaries-${{ matrix.rpm_arch }}
+          path: portable-binaries-${{ matrix.rpm_arch }}.tar.xz
+          retention-days: 1
+          if-no-files-found: error
+
+  build-deb:
+    name: Build ${{ matrix.deb_arch }} DEB
+    needs: build-rpm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            rpm_arch: x86_64
+            deb_arch: amd64
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            rpm_arch: aarch64
+            deb_arch: arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      PERSIST_PACKAGE_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download portable binaries
+        uses: actions/download-artifact@v5
+        with:
+          name: persistshell-binaries-${{ matrix.rpm_arch }}
+          path: staging
+
+      - name: Restore release binaries
+        run: |
+          set -euo pipefail
+          mkdir -p "target/${{ matrix.target }}/release"
+          tar -xJf "staging/portable-binaries-${{ matrix.rpm_arch }}.tar.xz" \
+            -C "target/${{ matrix.target }}/release"
+
+      - name: Create portable DEB
+        run: scripts/package-release.sh deb
+
+      - name: Verify DEB artifact
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum --check *.sha256)
+          test "$(dpkg-deb --field dist/*.deb Architecture)" = "${{ matrix.deb_arch }}"
+          dpkg-deb --contents dist/*.deb | grep '/usr/bin/persistd$'
+          dpkg-deb --contents dist/*.deb |
+            grep '/usr/libexec/persistshell/persist-holder$'
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: persistshell-deb-${{ matrix.deb_arch }}
+          path: |
+            dist/*.deb
+            dist/*.sha256
+          if-no-files-found: error
+
+  rpm-smoke:
+    name: RPM smoke ${{ matrix.name }} ${{ matrix.rpm_arch }}
+    needs: build-rpm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: rocky-8
+            image: rockylinux/rockylinux:8
+            runner: ubuntu-24.04
+            rpm_arch: x86_64
+          - name: rocky-9
+            image: rockylinux/rockylinux:9
+            runner: ubuntu-24.04
+            rpm_arch: x86_64
+          - name: rocky-10
+            image: rockylinux/rockylinux:10
+            runner: ubuntu-24.04
+            rpm_arch: x86_64
+          - name: centos-stream-9
+            image: quay.io/centos/centos:stream9
+            runner: ubuntu-24.04
+            rpm_arch: x86_64
+          - name: centos-stream-10
+            image: quay.io/centos/centos:stream10
+            runner: ubuntu-24.04
+            rpm_arch: x86_64
+          - name: rocky-8
+            image: rockylinux/rockylinux:8
+            runner: ubuntu-24.04-arm
+            rpm_arch: aarch64
+          - name: rocky-10
+            image: rockylinux/rockylinux:10
+            runner: ubuntu-24.04-arm
+            rpm_arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install smoke tools
+        run: dnf install --assumeyes bash findutils git grep procps-ng tar xz
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download RPM artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: persistshell-rpm-${{ matrix.rpm_arch }}
+          path: packages
+
+      - name: Install and exercise package
+        run: |
+          set -euo pipefail
+          (cd packages && sha256sum --check *.sha256)
+          dnf install --assumeyes ./packages/*.rpm
+          persist --version
+          persistd --version
+          PERSIST_BIN=/usr/bin/persist \
+            PERSISTD_BIN=/usr/bin/persistd \
+            PERSIST_COMPAT_SHELLS=bash \
+            scripts/compatibility-matrix.sh
+
+  deb-smoke:
+    name: DEB smoke ${{ matrix.name }} ${{ matrix.deb_arch }}
+    needs: build-deb
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu-22.04
+            image: ubuntu:22.04
+            runner: ubuntu-24.04
+            deb_arch: amd64
+          - name: ubuntu-24.04
+            image: ubuntu:24.04
+            runner: ubuntu-24.04
+            deb_arch: amd64
+          - name: ubuntu-26.04
+            image: ubuntu:26.04
+            runner: ubuntu-24.04
+            deb_arch: amd64
+          - name: debian-11
+            image: debian:11
+            runner: ubuntu-24.04
+            deb_arch: amd64
+          - name: debian-12
+            image: debian:12
+            runner: ubuntu-24.04
+            deb_arch: amd64
+          - name: debian-13
+            image: debian:13
+            runner: ubuntu-24.04
+            deb_arch: amd64
+          - name: ubuntu-22.04
+            image: ubuntu:22.04
+            runner: ubuntu-24.04-arm
+            deb_arch: arm64
+          - name: ubuntu-26.04
+            image: ubuntu:26.04
+            runner: ubuntu-24.04-arm
+            deb_arch: arm64
+          - name: debian-11
+            image: debian:11
+            runner: ubuntu-24.04-arm
+            deb_arch: arm64
+          - name: debian-13
+            image: debian:13
+            runner: ubuntu-24.04-arm
+            deb_arch: arm64
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install smoke tools
+        run: |
+          apt-get update
+          apt-get install --yes bash ca-certificates git grep procps tar xz-utils
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download DEB artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: persistshell-deb-${{ matrix.deb_arch }}
+          path: packages
+
+      - name: Install and exercise package
+        run: |
+          set -euo pipefail
+          (cd packages && sha256sum --check *.sha256)
+          apt-get install --yes ./packages/*.deb
+          persist --version
+          persistd --version
+          PERSIST_BIN=/usr/bin/persist \
+            PERSISTD_BIN=/usr/bin/persistd \
+            PERSIST_COMPAT_SHELLS=bash \
+            scripts/compatibility-matrix.sh

@@ -62,11 +62,12 @@ cargo test --workspace --all-features
 - tag push，例如 `v*`
 - workflow_dispatch
 
-当前发布包构建必须按运行时 ABI 分开生成：
+当前发布包使用 glibc 2.28 单一 ABI，每个架构只构建一次：
 
-- Ubuntu 26.04 x86_64 tarball 与 Debian `.deb`
-- RHEL 9 x86_64 tarball 与 `.el9` RPM
+- x86_64 与 aarch64 release binaries
+- 通用 Linux tar.xz、Debian `.deb` 与 RPM `.rpm`
 - SHA256 checksums
+- RPM/DEB 3 MiB、tar.xz 3.5 MiB 体积门禁
 
 后续发布阶段应支持：
 
@@ -74,39 +75,43 @@ cargo test --workspace --all-features
 - artifact upload
 - 可选签名
 
-本地先在目标用户空间构建 release binaries，再执行对应格式：
+本地先在 EL8 级用户空间构建 release binaries，再执行对应格式：
 
 ```text
-cargo build --release --workspace --locked
-PERSIST_PACKAGE_PLATFORM=ubuntu-26.04 scripts/package-release.sh tarball deb
-PERSIST_PACKAGE_PLATFORM=rhel9 PERSIST_PACKAGE_RPM_RELEASE=1.el9 \
-  scripts/package-release.sh tarball rpm
+cargo build --release --workspace --locked \
+  --target x86_64-unknown-linux-gnu
+scripts/check-linux-release.sh x86_64-unknown-linux-gnu
+PERSIST_PACKAGE_TARGET=x86_64-unknown-linux-gnu \
+  scripts/package-release.sh tarball deb rpm
 ```
 
-GitHub `ubuntu-26.04` runner 原生构建 Ubuntu 包。RHEL 9 包在 `rockylinux:9` job container
-中原生构建，并拒绝最高 GLIBC 需求超过 2.34 的二进制。禁止在 Ubuntu 上构建二进制后再包装
-成 RHEL RPM。
+GitHub 使用 x64/ARM64 原生 runner，在 `rockylinux:8` container 中构建，并拒绝最高
+GLIBC 需求超过 2.28、架构错误或保留 debug section 的二进制。同一架构的 RPM、DEB 和
+tar.xz 必须复用这次构建，禁止在新用户空间重新编译后伪装成通用包。
 
 GitHub Actions 构建出的包必须作为 workflow artifacts 上传，tag release 时可进一步附加到 GitHub Release。
 
 ## Target Platforms
 
-Phase 1 当前支持：
+当前发布架构和用户空间：
 
 ```text
-Ubuntu 26.04 x86_64
-RHEL 9 compatible x86_64
-```
-
-后续再扩展：
-
-```text
+x86_64-unknown-linux-gnu
 aarch64-unknown-linux-gnu
-x86_64-unknown-linux-musl
-aarch64-unknown-linux-musl
+glibc 2.28+
 ```
 
-跨平台构建不得影响 Linux PTY 语义测试。不能为了跨平台牺牲 Linux 行为正确性。
+不支持：
+
+```text
+i686 / ARMv7
+EL7
+musl/Alpine
+```
+
+Package workflow 在 Rocky 8/9/10、CentOS Stream 9/10、Ubuntu 22.04/24.04/26.04 和
+Debian 11/12/13 执行安装 smoke；两种架构都覆盖最低和最高代表版本。跨平台构建不得
+影响 Linux PTY 语义测试，不能为了跨平台牺牲 Linux 行为正确性。
 
 ## Package Contents
 
@@ -133,13 +138,15 @@ aarch64-unknown-linux-musl
 - 不依赖未提交文件。
 - 不包含 secret。
 
-推荐命名：
+固定命名：
 
 ```text
-persistshell-v0.1.0-ubuntu-26.04-x86_64-unknown-linux-gnu.tar.gz
-persistshell-v0.1.0-rhel9-x86_64-unknown-linux-gnu.tar.gz
+persistshell-v0.1.0-linux-x86_64.tar.xz
+persistshell-v0.1.0-linux-aarch64.tar.xz
 persistshell_0.1.0_amd64.deb
-persistshell-0.1.0-1.el9.x86_64.rpm
+persistshell_0.1.0_arm64.deb
+persistshell-0.1.0-1.x86_64.rpm
+persistshell-0.1.0-1.aarch64.rpm
 ```
 
 ## GitHub Mirror Rule

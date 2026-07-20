@@ -111,7 +111,8 @@
 | M53 | Daemon 崩溃可恢复 PTY Holder | ☑ 已完成 | 九阶段实现、故障注入、平台包、性能和 Rocky test 验证完成 |
 | M54 | 最终 Shell 状态 Side Channel | ☑ 已完成 | 最终 cwd、离线退出、崩溃对账、双平台包和 Rocky test 验证完成 |
 | M55 | Closed Session 动态环境恢复 | ☑ 已完成 | 动态 set/unset、兼容、安全、双平台包和 Rocky 验证完成 |
-| M56 | 时间化日志与完整 Replay | ☐ 未开始 | 兼容日志格式、`--speed` 和事件驱动 `--follow` |
+| M56 | 通用 Linux 多架构发布包 | ◐ 进行中 | glibc 2.28、x86_64/ARM64、通用 RPM/DEB/tar.xz 与体积门禁 |
+| M57 | 时间化日志与完整 Replay | ☐ 未开始 | 兼容日志格式、`--speed` 和事件驱动 `--follow` |
 
 ---
 

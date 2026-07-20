@@ -78,6 +78,7 @@
 - `docs/audit/2026-07-19-m53-pty-holder-validation.md`
 - `docs/audit/2026-07-20-m54-final-shell-state-validation.md`
 - `docs/audit/2026-07-20-m55-dynamic-environment-recovery-validation.md`
+- `docs/audit/2026-07-20-m56-portable-packages-validation.md`
 - `docs/adr/ADR-0000-template.md`
 - `docs/adr/ADR-0001-rust-primary-language.md`
 - `docs/adr/ADR-0002-closed-session-recovery-context.md`
@@ -86,10 +87,12 @@
 - `docs/adr/ADR-0005-per-user-pty-holder.md`
 - `docs/adr/ADR-0006-final-shell-state-side-channel.md`
 - `docs/adr/ADR-0007-safe-dynamic-environment-recovery.md`
+- `docs/adr/ADR-0008-portable-linux-packages.md`
 - `docs/superpowers/specs/2026-07-20-m54-final-shell-state-side-channel-design.md`
 - `docs/superpowers/specs/2026-07-20-m54-final-shell-state-side-channel-implementation-plan.md`
 - `docs/superpowers/specs/2026-07-20-m55-dynamic-environment-recovery-design.md`
 - `docs/superpowers/specs/2026-07-20-m55-dynamic-environment-recovery-implementation-plan.md`
+- `docs/superpowers/specs/2026-07-20-m56-portable-packages-design.md`
 - `docs/design/LICENSING.md`
 
 ## 当前约束

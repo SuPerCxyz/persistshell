@@ -16,42 +16,45 @@ Phase 4：发布和长期维护
 
 ## 当前里程碑
 
-M56：时间化日志与完整 Replay。
+M56：通用 Linux 多架构发布包。
 
 ---
 
 ## 当前唯一任务
 
-设计 M56：时间化日志、replay `--speed` 和事件驱动 `--follow`。
+实现 M56：glibc 2.28 基线的 x86_64/ARM64 通用 Linux 发布包。
 
 ### 前置已完成
 
 - M55 Closed Session 动态环境恢复已完成。
-- M55 功能、安全、性能、Ubuntu 包、Rocky RPM 和远程验证审计已完成。
-- 当前 replay 支持完整输出、`--head` 和 `--tail`，但日志没有时间事件。
+- M56 设计和 ADR 已由维护者确认。
+- 当前 x86_64 包分别绑定 Ubuntu 26.04 和 RHEL 9，尚无 ARM64 产物。
 
 ---
 
 ## 任务范围
 
-- 只进行 M56 需求澄清、方案比较、架构设计和 ADR/设计文档。
-- 定义兼容旧日志的时间化格式、轮转边界和损坏恢复。
-- 定义 `--speed` 的时间缩放、暂停/信号和非交互语义。
-- 定义基于 inotify/事件源的 `--follow`，禁止 sleep polling。
-- 定义日志容量、安全、性能、升级和测试矩阵。
+- 以 glibc 2.28 为统一 ABI，按 x86_64/aarch64 各构建一次。
+- 生成不绑定发行版名称的 RPM、DEB、tar.xz 和 SHA-256。
+- 增加 release 体积优化及 RPM/DEB 3 MiB、tar.xz 3.5 MiB 门禁。
+- 为不支持 `pidfd_open` 的内核实现有界、安全的进程身份 fallback。
+- 扩展 GitHub Actions 原生双架构构建与多发行版安装/运行验证。
+- 更新安装、CI、兼容范围、限制和发布文档。
 
 ---
 
 ## 完成标准
 
-1. 现有 replay、日志 writer、轮转和打包边界完成代码审计。
-2. 至少比较两种兼容日志格式和 follow 事件模型。
-3. 中文设计规范与 ADR 通过维护者确认。
-4. 未经确认不写 M56 实现代码。
+1. 六类主产物名称、架构 metadata、checksum 和内容验证通过。
+2. 所有 ELF 的最高 GLIBC symbol 不超过 2.28。
+3. 两种架构通过构建，代表性 RPM/DEB 发行版完成安装和运行 smoke。
+4. pidfd 正常路径和强制 fallback 路径测试通过。
+5. workspace fmt、clippy、test 与体积门禁通过。
+6. M56 审计和项目状态文档更新完成。
 
 ---
 
 ## 禁止事项
 
-当前只设计 M56，不实现日志格式、`--speed` 或 `--follow`，
-不修改 CI、发布配置或 metadata schema。
+不实现 M57 时间化日志、`--speed` 或 `--follow`，不修改 metadata schema，
+不增加 i686、ARMv7、musl 或未经验证的发行版认证。

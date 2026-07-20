@@ -1,6 +1,7 @@
 mod client;
 mod data;
 mod process;
+mod process_watch;
 mod reconcile;
 
 use std::collections::HashMap;
@@ -21,7 +22,7 @@ pub(crate) struct HolderRuntime {
     socket_path: std::path::PathBuf,
     replay_bytes: u32,
     cache: Arc<RwLock<HolderInventorySnapshot>>,
-    process_exit: process::ProcessExit,
+    process_exit: process_watch::ProcessExit,
     connected: AtomicBool,
     child: std::sync::Mutex<Option<std::process::Child>>,
     operations: std::sync::Mutex<()>,
@@ -74,7 +75,7 @@ impl HolderRuntime {
             return Ok(None);
         };
         let (client, child) = process::connect_or_start(runtime_dir, socket_path, &binary)?;
-        let process_exit = process::ProcessExit::watch(client.holder_pid())?;
+        let process_exit = process_watch::ProcessExit::watch(client.holder_pid())?;
         let cache = Arc::new(RwLock::new(client.inventory_snapshot()?.into()));
         Ok(Some(Self {
             client,
