@@ -270,6 +270,7 @@ jobs:
           path: packages
 
       - name: Install and exercise package
+        shell: bash
         run: |
           set -euo pipefail
           (cd packages && sha256sum --check *.sha256)
