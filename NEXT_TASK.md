@@ -22,11 +22,12 @@ M57：时间化日志与完整 Replay。
 
 ## 当前唯一任务
 
-完成 M57 的设计、ADR 和分阶段实施计划。
+实现 M57 第一阶段：Running/Closed Attach 历史连续性。
 
 ### 前置已完成
 
 - M56 通用 Linux 多架构发布包已完成。
+- Attach 历史连续性设计、ADR 和实施计划已确认。
 - 当前 Session 日志是无时间信息的原始字节流。
 - `persist replay --speed` 与 `--follow` 仅完成参数解析，尚无实际效果。
 
@@ -34,27 +35,27 @@ M57：时间化日志与完整 Replay。
 
 ## 任务范围
 
-- 审计现有 Holder 日志写入、轮转、replay 读取和 public CLI 调用链。
-- 设计兼容旧纯文本日志的版本化时间记录格式和迁移/降级策略。
-- 定义 `replay --speed` 的倍率、零值、边界、信号和终端行为。
-- 设计事件驱动 `--follow`，覆盖轮转、Session 退出、daemon/Holder 重启和慢客户端。
-- 明确日志容量、内存、I/O 延迟、安全权限、损坏恢复和性能门禁。
-- 创建 ADR、中文 design spec 和可逐阶段执行的实现计划，更新关联文档。
+- Running Session 继续使用 Holder Ring 回放最近输出。
+- Closed Session 恢复前安全读取轮转日志最近 `replay_bytes`。
+- 保证旧历史、新 prompt、实时输出的稳定顺序。
+- 日志缺失或不安全时降级继续恢复，不跟随 symlink。
+- 补齐真实 public attach、exit、Ctrl+D 和配置边界测试。
+- 更新文档、构建修复包并在 `test` 主机验证。
 
 ---
 
 ## 完成标准
 
-1. 当前日志和 replay 数据流有代码证据及兼容边界。
-2. 日志格式可同时处理旧日志、新记录、截断尾部、损坏记录和轮转。
-3. `--speed` 与 `--follow` 的用户行为、退出条件和错误语义无歧义。
-4. 方案保持有界内存、无 sleep polling、不阻塞 PTY 日志写入。
-5. ADR 记录选择、拒绝方案、风险、回滚和升级策略。
-6. 实施计划按 TDD 阶段列出文件、测试、验证和文档更新。
+1. Running 和 Closed 两条路径均回放最近 `replay_bytes`。
+2. Closed 输出顺序为旧历史、新 prompt、实时输出。
+3. 轮转、截断、关闭日志和不安全文件测试通过。
+4. 不修改 wire、metadata schema 或日志格式。
+5. workspace 完整门禁和性能边界通过。
+6. 修复包在 `test` 完成真实 SSH 验证。
 
 ---
 
 ## 禁止事项
 
-本任务只完成设计，不修改代码、日志文件或 metadata schema，不提前实现
-`--speed`/`--follow`，不引入集中式日志服务或无限历史。
+不修改日志格式、metadata schema 或 public/private wire，不提前实现 `--speed`/`--follow`，
+不引入终端模拟、集中式日志服务或无限历史。

@@ -379,3 +379,4 @@
 - [x] M56：实现不支持 pidfd 内核的进程身份 fallback
 - [x] M56：完成双架构、多发行版安装和运行验证
 - [ ] M57：实现时间化日志、replay `--speed` 和事件驱动 `--follow`
+- [ ] M57：实现 Running/Closed Attach 有界历史连续性

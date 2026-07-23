@@ -8,6 +8,11 @@
 
 ## Unreleased
 
+### Added
+
+- 确认 M57 Attach 历史连续性设计与 ADR：Running Session 使用 Holder Ring，Closed
+  Session 在恢复前安全读取有界轮转日志尾部，并保持旧历史、新 prompt、实时输出顺序。
+
 ## [0.2.0] - 2026-07-20
 
 ### Added

@@ -112,7 +112,7 @@
 | M54 | 最终 Shell 状态 Side Channel | ☑ 已完成 | 最终 cwd、离线退出、崩溃对账、双平台包和 Rocky test 验证完成 |
 | M55 | Closed Session 动态环境恢复 | ☑ 已完成 | 动态 set/unset、兼容、安全、双平台包和 Rocky 验证完成 |
 | M56 | 通用 Linux 多架构发布包 | ☑ 已完成 | glibc 2.28 双架构通用包、体积门禁和 17 组发行版 smoke |
-| M57 | 时间化日志与完整 Replay | ☐ 未开始 | 兼容日志格式、`--speed` 和事件驱动 `--follow` |
+| M57 | 时间化日志与完整 Replay | ◐ 进行中 | 第一阶段修复 Running/Closed Attach 历史连续性 |
 
 ---
 
