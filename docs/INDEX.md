@@ -88,11 +88,13 @@
 - `docs/adr/ADR-0006-final-shell-state-side-channel.md`
 - `docs/adr/ADR-0007-safe-dynamic-environment-recovery.md`
 - `docs/adr/ADR-0008-portable-linux-packages.md`
+- `docs/adr/ADR-0009-bounded-attach-history-replay.md`
 - `docs/superpowers/specs/2026-07-20-m54-final-shell-state-side-channel-design.md`
 - `docs/superpowers/specs/2026-07-20-m54-final-shell-state-side-channel-implementation-plan.md`
 - `docs/superpowers/specs/2026-07-20-m55-dynamic-environment-recovery-design.md`
 - `docs/superpowers/specs/2026-07-20-m55-dynamic-environment-recovery-implementation-plan.md`
 - `docs/superpowers/specs/2026-07-20-m56-portable-packages-design.md`
+- `docs/superpowers/specs/2026-07-23-m57-attach-continuity-design.md`
 - `docs/design/LICENSING.md`
 
 ## 当前约束
