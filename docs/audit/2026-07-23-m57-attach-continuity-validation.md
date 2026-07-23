@@ -28,6 +28,10 @@ git diff --check
 - Attach 历史读取覆盖轮转正序、512 KiB 截断、非 UTF-8、缺失、零上限、
   symlink、FIFO、owner、mode 和文件数量上限。
 - CLI 覆盖 partial stdout write、closed output 和 stdin poll failure。
+- GitHub 首轮 CI 暴露 daemon crash 测试在新 PID 写入后立即连接 socket 的竞态；测试改为
+  等待新 daemon 实际 accept，并连续定向验证 3 次。
+- workspace 高并发负载下 Ctrl+D 生命周期可能超过原 8 秒测试 deadline；门禁只将等待预算
+  调整为 20 秒，Closed 状态、exit code 和 cwd 断言保持不变。
 
 512 KiB 多轮转 release 测试进程采样为 0.06 秒、40,496 KiB RSS；RSS 包含 Cargo
 测试进程，功能断言确认返回 Vec 严格为 524,288 字节。

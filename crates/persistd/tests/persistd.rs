@@ -67,6 +67,21 @@ fn wait_for_pid(path: &Path, child: &mut Child, expected: u32) {
     panic!("timed out waiting for daemon pid file");
 }
 
+fn connect_when_ready(path: &Path, child: &mut Child) -> ClientSocket {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
+        assert!(
+            child.try_wait().expect("check recovered daemon").is_none(),
+            "recovered daemon exited before accepting clients"
+        );
+        if let Ok(client) = ClientSocket::connect(path) {
+            return client;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    panic!("timed out connecting to recovered daemon");
+}
+
 fn read_until_type(stream: &mut std::os::unix::net::UnixStream, expected: MessageType) -> Frame {
     for _ in 0..64 {
         let frame = read_frame(stream).expect("read expected frame");
@@ -858,7 +873,7 @@ fn daemon_crash_leaves_holder_for_next_daemon_claim() {
         std::fs::metadata(&holder_socket).unwrap().ino(),
         holder_inode
     );
-    let mut recovered = ClientSocket::connect(&public_socket).expect("connect recovered daemon");
+    let mut recovered = connect_when_ready(&public_socket, &mut second);
     recovered
         .send_hello(unsafe { libc::getuid() }, std::process::id())
         .expect("recovered daemon hello");

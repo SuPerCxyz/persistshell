@@ -12,6 +12,8 @@ use persist_ipc::{
 };
 use persist_metadata::MetadataStore;
 
+const LIFECYCLE_TIMEOUT: Duration = Duration::from_secs(20);
+
 struct TestEnv {
     temp: tempfile::TempDir,
     home: PathBuf,
@@ -288,7 +290,7 @@ fn read_stdout_until(client: &mut ClientSocket, marker: &[u8]) -> bool {
 }
 
 fn wait_for_closed(env: &TestEnv, session_id: u32, exit_code: i32, cwd: Option<&Path>) {
-    let deadline = Instant::now() + Duration::from_secs(8);
+    let deadline = Instant::now() + LIFECYCLE_TIMEOUT;
     loop {
         let record = env
             .metadata()
