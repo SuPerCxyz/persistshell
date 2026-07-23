@@ -54,10 +54,10 @@ Phase 1 Session 日志不定位为企业审计系统。
 
 ## 日志路径
 
-建议：
+Session 输出日志：
 
 ```text
-~/.local/share/persistshell/logs/<session-id>.log
+~/.local/share/persistshell/sessions/<session-id>.log
 ```
 
 内部日志：
@@ -69,7 +69,7 @@ Phase 1 Session 日志不定位为企业审计系统。
 
 或者遵循 XDG 目录规范。
 
-M03 已实现内部运行日志的基础文件 writer。Session 输出日志仍未实现。
+Session 输出日志和按大小轮转已经实现，日志保持原始 PTY 字节流。
 
 ---
 
@@ -158,10 +158,12 @@ max_files = 10
 ```text
 session.log
 session.log.1
-session.log.2.gz
+session.log.2
 ```
 
-M03 暂未实现完整轮转，只保留配置项和校验。完整轮转必须在后续日志任务中实现。
+Closed Session attach 从当前文件向旧轮转文件读取最近的有界尾部，再按时间正序发送。读取使用
+固定文件名、`O_NOFOLLOW` 和 fd metadata 校验；symlink、非普通文件、错误 owner 或宽松权限
+会安全降级为无历史，不阻止 Shell 上下文恢复。
 
 ---
 

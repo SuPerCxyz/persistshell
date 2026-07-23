@@ -79,6 +79,7 @@
 - `docs/audit/2026-07-20-m54-final-shell-state-validation.md`
 - `docs/audit/2026-07-20-m55-dynamic-environment-recovery-validation.md`
 - `docs/audit/2026-07-20-m56-portable-packages-validation.md`
+- `docs/audit/2026-07-23-m57-attach-continuity-validation.md`
 - `docs/adr/ADR-0000-template.md`
 - `docs/adr/ADR-0001-rust-primary-language.md`
 - `docs/adr/ADR-0002-closed-session-recovery-context.md`
@@ -111,3 +112,5 @@ M55 已完成安全动态环境 set/unset、当前连接优先、版本化状态
 双平台包和 Rocky test 验证。
 M56 已完成 GLIBC_2.28 的 x86_64/ARM64 通用 RPM、DEB、tar.xz、体积门禁和
 Rocky/CentOS Stream、Ubuntu/Debian 多发行版安装运行验证。
+M57 第一阶段已完成 Running/Closed Attach 有界历史连续性、SSH PTY 大回放修复和 Rocky
+9.7 验证；时间化日志、`replay --speed` 与事件驱动 `--follow` 仍待实现。

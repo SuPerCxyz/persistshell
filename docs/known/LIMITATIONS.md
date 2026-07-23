@@ -83,7 +83,10 @@ attach 不可用；这属于一致性降级，不是 PTY 恢复。
 对于 vim/top/less 等全屏程序：
 
 - 应能继续交互。
-- 不承诺所有屏幕状态完美恢复。
+- Running attach 回放最近的原始 PTY 字节，Closed attach 回放最近的原始日志字节。
+- 回放上限由 `ring_buffer.replay_bytes` 控制，超过边界的旧输出不会自动显示。
+- 不维护终端模拟器屏幕快照，不承诺所有屏幕状态完美恢复。
+- `logging.session_log=false` 时，Closed Session 没有退出前输出可供回放。
 
 ---
 

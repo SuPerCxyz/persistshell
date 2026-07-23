@@ -46,16 +46,16 @@ test -x /usr/libexec/persistshell/persist-holder
 
 ```bash
 # Debian/Ubuntu x86_64
-sudo apt install ./persistshell_0.2.0_amd64.deb
+sudo apt install ./persistshell_0.2.1_amd64.deb
 
 # Debian/Ubuntu ARM64
-sudo apt install ./persistshell_0.2.0_arm64.deb
+sudo apt install ./persistshell_0.2.1_arm64.deb
 
 # RHEL/Rocky/AlmaLinux x86_64
-sudo dnf install ./persistshell-0.2.0-1.x86_64.rpm
+sudo dnf install ./persistshell-0.2.1-1.x86_64.rpm
 
 # RHEL/Rocky/AlmaLinux ARM64
-sudo dnf install ./persistshell-0.2.0-1.aarch64.rpm
+sudo dnf install ./persistshell-0.2.1-1.aarch64.rpm
 ```
 
 正式包要求 glibc 2.28 或更高。支持 Ubuntu 22.04/24.04/26.04、Debian 11/12/13 和
@@ -116,6 +116,10 @@ SSH client，或在另一个终端执行：
 persist detach 2
 ```
 
+重新 attach Running Session 时会先显示最近输出，再继续接收实时输出；断线期间产生的输出也会
+包含在回放中。重新 attach Closed Session 时，会先显示退出前的最近输出，再启动恢复后的新
+Shell。默认最多回放 512 KiB，边界由 `ring_buffer.replay_bytes` 控制。
+
 ## 5. 正确理解退出行为
 
 以下操作含义不同：
@@ -130,7 +134,9 @@ persist detach 2
 | `persist kill <id>` | 强制终止 | 保留关闭结果 | 可按状态处理 |
 
 `exit` 和 Shell 空行上的 `Ctrl+D` 不会让 Session 在后台继续占用 Shell 和 PTY。Closed Session
-再次 attach 时会启动新的 Shell runtime；已退出的前台进程不会复活。
+再次 attach 时会先回放退出前的最近输出，再启动新的 Shell runtime；已退出的前台进程不会
+复活。若关闭 Session 输出日志，则 Closed Session 仍可恢复 cwd 和允许的环境变量，但没有退出前
+输出可供回放。
 
 ## 6. 使用 `persist ls` 选择 Session
 

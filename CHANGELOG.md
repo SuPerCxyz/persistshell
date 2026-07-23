@@ -12,6 +12,16 @@
 
 - 确认 M57 Attach 历史连续性设计与 ADR：Running Session 使用 Holder Ring，Closed
   Session 在恢复前安全读取有界轮转日志尾部，并保持旧历史、新 prompt、实时输出顺序。
+- 实现 M57 Attach 历史连续性：Closed Session 使用 dirfd、`O_NOFOLLOW` 和 fd metadata
+  安全读取轮转日志尾部，并通过 1 MiB 有界代理队列分片发送；Running Session 继续使用
+  Holder Ring，断线期间输出可在重新 attach 时回放。
+- 新增真实 public IPC、SSH 断开、`exit`、空行 `Ctrl+D`、严格输出顺序、512 KiB 跨轮转
+  截断及 symlink/FIFO/权限降级回归，不修改 wire、metadata schema 或日志格式。
+- 修复 SSH PTY 的 stdin/stdout/stderr 共享 nonblocking 状态时，大回放丢失 partial stdout
+  write 且 writer 状态提示因 `EAGAIN` panic 的问题；客户端改为完整输出并在终端关闭时安全
+  detach。
+- 升级到 0.2.1；Rocky 8 基线 x86_64 RPM/tar.xz 保持 GLIBC 2.28 且各约 1.4 MiB，
+  Rocky 9.7 完成 Running/Closed/Ctrl+D、512 KiB、日志关闭和 daemon 重启验证。
 
 ## [0.2.0] - 2026-07-20
 

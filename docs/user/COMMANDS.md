@@ -60,7 +60,7 @@ persist version
 输出：
 
 ```text
-persist 0.2.0
+persist 0.2.1
 ```
 
 ---
@@ -200,6 +200,10 @@ persist attach --readonly 2
 
 默认 attach 可写；另一台电脑可 attach 并接管唯一的 active writer，之前的 writer 会被撤销。
 `--readonly` 只能接收输出，不能发送输入。
+
+Running Session 从内存 Ring 回放最近输出，包括无人连接期间的输出。Closed Session 从受保护
+的轮转日志读取最近输出，随后创建新的 Shell runtime。两者均受 `ring_buffer.replay_on_attach`
+和 `ring_buffer.replay_bytes` 控制，回放完成后才进入实时 I/O。
 
 ---
 

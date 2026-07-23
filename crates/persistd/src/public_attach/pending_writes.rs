@@ -4,7 +4,7 @@ use std::os::fd::RawFd;
 
 use persist_core::{PersistError, Result};
 
-const MAX_PROXY_QUEUE: usize = 1024 * 1024;
+pub(super) const MAX_PROXY_QUEUE: usize = 1024 * 1024;
 
 pub(super) struct PendingWrites {
     items: VecDeque<Vec<u8>>,
@@ -35,6 +35,10 @@ impl PendingWrites {
 
     pub(super) fn has_data(&self) -> bool {
         !self.items.is_empty()
+    }
+
+    pub(super) fn remaining_capacity(&self) -> usize {
+        MAX_PROXY_QUEUE - self.bytes
     }
 
     pub(super) fn flush(&mut self, fd: RawFd) -> Result<()> {

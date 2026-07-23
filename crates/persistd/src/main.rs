@@ -1,3 +1,4 @@
+mod attach_history;
 mod dashboard;
 mod holder;
 mod lifecycle;

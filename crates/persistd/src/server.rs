@@ -792,6 +792,26 @@ impl SessionManager {
         self.replay_bytes = max_bytes;
     }
 
+    fn closed_attach_history(&self, id: u32) -> Vec<u8> {
+        if !self.replay_on_attach || !self.session_log_enabled || self.replay_bytes == 0 {
+            return Vec::new();
+        }
+        match crate::attach_history::read_rotated_tail(
+            &self.logs_dir,
+            id,
+            self.max_files,
+            self.replay_bytes,
+        ) {
+            Ok(history) => history,
+            Err(error) => {
+                eprintln!(
+                    "persistd: Session {id} attach history unavailable; continuing without replay: {error}"
+                );
+                Vec::new()
+            }
+        }
+    }
+
     fn dashboard_sample_request(&self) -> SampleRequest {
         let mut roots = Vec::new();
         #[cfg(test)]
@@ -2156,6 +2176,7 @@ fn handle_client(
                 MessageType::Attach => {
                     if let Some(payload) = decode_attach(&frame.payload) {
                         let sid = payload.session_id;
+                        let mut initial_output = Vec::new();
                         let connection_env =
                             validate_connection_environment(&payload.connection_env, unsafe {
                                 libc::getuid()
@@ -2174,6 +2195,7 @@ fn handle_client(
                                 .as_ref()
                                 .is_some_and(|record| record.status == "closed")
                         {
+                            initial_output = sm.lock().unwrap().closed_attach_history(sid);
                             let record = record.as_ref().expect("closed record was checked");
                             let restored = (|| {
                                 let policy = sm.lock().unwrap().recovery_environment_policy()?;
@@ -2208,6 +2230,8 @@ fn handle_client(
                                 if metadata_result.is_err() {
                                     let _ = sm.lock().unwrap().close_session(sid);
                                 }
+                            } else {
+                                initial_output.clear();
                             }
                         }
                         let holder = { sm.lock().unwrap().holder_backend() };
@@ -2274,6 +2298,7 @@ fn handle_client(
                                     fd,
                                     sid,
                                     data,
+                                    initial_output,
                                     true,
                                     Some(&mut observe_context),
                                 )?;
@@ -2400,8 +2425,14 @@ fn handle_client(
                             );
                             if let Ok(Some(data)) = data {
                                 sm.lock().unwrap().add_ro_client(sid, fd);
-                                let outcome =
-                                    crate::public_attach::run(fd, sid, data, false, None)?;
+                                let outcome = crate::public_attach::run(
+                                    fd,
+                                    sid,
+                                    data,
+                                    Vec::new(),
+                                    false,
+                                    None,
+                                )?;
                                 sm.lock().unwrap().remove_ro_client(sid, fd);
                                 if let Some(context) = outcome.exit_context {
                                     if let Err(error) =
@@ -3397,6 +3428,31 @@ mod tests {
         assert_eq!(manager.replay_output(sid), b"history");
         manager.set_replay_config(false, 7);
         assert!(manager.replay_output(sid).is_empty());
+    }
+
+    #[test]
+    fn closed_replay_respects_limit_and_disable_flag() {
+        let dir = tempfile::Builder::new()
+            .prefix("persistd-closed-replay-")
+            .tempdir()
+            .expect("create temp dir");
+        let logs_dir = dir.path().join("sessions");
+        std::fs::create_dir(&logs_dir).expect("create logs dir");
+        std::fs::set_permissions(&logs_dir, std::fs::Permissions::from_mode(0o700))
+            .expect("secure logs dir");
+        let log_path = logs_dir.join("7.log");
+        std::fs::write(&log_path, b"output-history").expect("write log");
+        std::fs::set_permissions(&log_path, std::fs::Permissions::from_mode(0o600))
+            .expect("secure log");
+        let mut manager =
+            SessionManager::new(0, true, logs_dir, dir.path().join("history"), 1024, 0);
+
+        manager.set_replay_config(true, 7);
+        assert_eq!(manager.closed_attach_history(7), b"history");
+        manager.set_replay_config(false, 7);
+        assert!(manager.closed_attach_history(7).is_empty());
+        manager.set_replay_config(true, 0);
+        assert!(manager.closed_attach_history(7).is_empty());
     }
 
     #[test]

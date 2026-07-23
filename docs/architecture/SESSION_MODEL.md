@@ -177,12 +177,12 @@ Closed Session 仍然保留：
 - metadata
 - 最终 cwd（状态 side channel 成功时）或最后一个可信回退 cwd
 - 正常退出时保存的受限动态环境变量快照
-- ring buffer
 - 持久日志
 - exit code
 
 用户之后可以 attach 回这个 Session。此时 Holder 重新创建 PTY 和用户 shell，并用保存的 cwd、
-受限动态环境快照和输出历史恢复上下文。未导出或未被当前策略允许的变量不会恢复。
+受限动态环境快照恢复上下文。Daemon 会在创建新 runtime 前从持久日志读取最近的有界输出，
+并确保旧历史先于新 Shell 输出发送。Closed 状态不保留旧 runtime 的内存 Ring。
 
 注意：Closed 只能恢复 Shell 上下文，不能复活已经随 `exit` 结束的前台进程或普通子进程。
 

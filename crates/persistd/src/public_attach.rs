@@ -19,14 +19,51 @@ mod pending_writes;
 use context_timer::ContextTimer;
 use pending_writes::PendingWrites;
 
+const PUBLIC_FRAME_HEADER: usize = 12;
+const HISTORY_FRAME_PAYLOAD: usize = 64 * 1024;
+
 pub(crate) struct ProxyOutcome {
     pub(crate) exit_context: Option<ExitContext>,
+}
+
+struct InitialOutput {
+    bytes: Vec<u8>,
+    offset: usize,
+}
+
+impl InitialOutput {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self { bytes, offset: 0 }
+    }
+
+    fn is_done(&self) -> bool {
+        self.offset == self.bytes.len()
+    }
+
+    fn fill(&mut self, output: &mut PendingWrites) -> Result<()> {
+        while !self.is_done() {
+            let capacity = output.remaining_capacity();
+            if capacity <= PUBLIC_FRAME_HEADER {
+                break;
+            }
+            let count = (self.bytes.len() - self.offset)
+                .min(HISTORY_FRAME_PAYLOAD)
+                .min(capacity - PUBLIC_FRAME_HEADER);
+            output.push(public_bytes(
+                MessageType::Stdout,
+                &self.bytes[self.offset..self.offset + count],
+            ))?;
+            self.offset += count;
+        }
+        Ok(())
+    }
 }
 
 pub(crate) fn run(
     public_fd: RawFd,
     session_id: u32,
     mut holder: HolderDataConnection,
+    initial_output: Vec<u8>,
     read_write: bool,
     mut observe_context: Option<&mut dyn FnMut()>,
 ) -> Result<ProxyOutcome> {
@@ -36,16 +73,23 @@ pub(crate) fn run(
     let mut holder_frames = HolderFrameAccumulator::new();
     let mut to_public = PendingWrites::new();
     let mut to_holder = PendingWrites::new();
+    let mut history = InitialOutput::new(initial_output);
+    history.fill(&mut to_public)?;
     let mut writer = read_write;
     let context_timer = observe_context
         .as_ref()
         .map(|_| ContextTimer::start())
         .transpose()?;
     loop {
+        let history_pending = !history.is_done() || to_public.has_data();
         let mut pollfds = [
-            pollfd(public_fd, to_public.has_data()),
-            pollfd(holder_fd, to_holder.has_data()),
-            pollfd(context_timer.as_ref().map_or(-1, ContextTimer::fd), false),
+            pollfd(public_fd, !history_pending, to_public.has_data()),
+            pollfd(holder_fd, !history_pending, to_holder.has_data()),
+            pollfd(
+                context_timer.as_ref().map_or(-1, ContextTimer::fd),
+                true,
+                false,
+            ),
         ];
         let ready = unsafe { libc::poll(pollfds.as_mut_ptr(), pollfds.len() as _, -1) };
         if ready < 0 {
@@ -55,7 +99,8 @@ pub(crate) fn run(
             }
             return Err(io_error("poll public holder proxy", source));
         }
-        if pollfds[0].revents & libc::POLLIN != 0
+        if !history_pending
+            && pollfds[0].revents & libc::POLLIN != 0
             && !read_public(
                 public_fd,
                 &mut public_frames,
@@ -68,7 +113,7 @@ pub(crate) fn run(
         {
             return Ok(ProxyOutcome { exit_context: None });
         }
-        if pollfds[1].revents & libc::POLLIN != 0 {
+        if !history_pending && pollfds[1].revents & libc::POLLIN != 0 {
             if let Some(outcome) = read_holder(
                 holder.stream(),
                 &mut holder_frames,
@@ -91,6 +136,7 @@ pub(crate) fn run(
         }
         if pollfds[0].revents & libc::POLLOUT != 0 {
             to_public.flush(public_fd)?;
+            history.fill(&mut to_public)?;
         }
         if pollfds[1].revents & libc::POLLOUT != 0 {
             to_holder.flush(holder_fd)?;
@@ -280,10 +326,10 @@ fn public_bytes(kind: MessageType, payload: &[u8]) -> Vec<u8> {
     bytes
 }
 
-fn pollfd(fd: RawFd, writable: bool) -> libc::pollfd {
+fn pollfd(fd: RawFd, readable: bool, writable: bool) -> libc::pollfd {
     libc::pollfd {
         fd,
-        events: libc::POLLIN | if writable { libc::POLLOUT } else { 0 },
+        events: if readable { libc::POLLIN } else { 0 } | if writable { libc::POLLOUT } else { 0 },
         revents: 0,
     }
 }
@@ -321,12 +367,31 @@ fn io_error(operation: &'static str, source: io::Error) -> PersistError {
 
 #[cfg(test)]
 mod tests {
-    use super::holder_resize_payload;
+    use super::{holder_resize_payload, InitialOutput, PendingWrites, PUBLIC_FRAME_HEADER};
 
     #[test]
     fn zero_public_resize_is_not_forwarded_to_holder() {
         assert!(holder_resize_payload(0, 80).is_none());
         assert!(holder_resize_payload(24, 0).is_none());
         assert_eq!(holder_resize_payload(24, 80).unwrap().len(), 4);
+    }
+
+    #[test]
+    fn initial_output_is_loaded_without_exceeding_proxy_queue() {
+        let mut history = InitialOutput::new(vec![7; 2 * 1024 * 1024]);
+        let mut queue = PendingWrites::new();
+        history.fill(&mut queue).unwrap();
+        assert!(!history.is_done());
+        assert!(queue.has_data());
+        assert!(queue.remaining_capacity() <= PUBLIC_FRAME_HEADER);
+    }
+
+    #[test]
+    fn small_initial_output_is_fully_queued() {
+        let mut history = InitialOutput::new(b"history".to_vec());
+        let mut queue = PendingWrites::new();
+        history.fill(&mut queue).unwrap();
+        assert!(history.is_done());
+        assert!(queue.has_data());
     }
 }

@@ -87,21 +87,17 @@ Phase 1 Ring Buffer 按字节流存储。
 
 ## Attach 回放
 
-Client attach 后，Daemon 应回放 Ring Buffer 中最近输出。
+Client attach 到 Running Session 后，Holder 回放 Ring Buffer 中最近输出，包括没有 client
+连接期间产生的输出。Running 路径不读取磁盘日志。
 
-默认回放量可以配置：
-
-```text
-replay_bytes = 1MB
-```
-
-或者：
+Client attach 到 Closed Session 时，旧 runtime 和 Ring 已释放；Daemon 在创建新 runtime 前从
+轮转 Session 日志读取同一字节上限的尾部，并先发送旧历史，再接收新 runtime 输出。
 
 ```text
-replay_lines = 200
+replay_bytes = 512KB
 ```
 
-Phase 1 推荐按字节实现，按行显示后续增强。
+回放按原始字节实现，不按行或终端屏幕状态解析。
 
 ---
 
@@ -114,13 +110,8 @@ replay_on_attach = true
 replay_bytes = 1048576
 ```
 
-用户可选择：
-
-```bash
-persist attach <id> --no-replay
-```
-
-Phase 1 可以暂不实现参数，但架构需预留。
+`replay_on_attach=false` 或 `replay_bytes=0` 时不自动回放。当前 CLI 不提供单次 attach 的
+`--no-replay` 覆盖参数。
 
 ---
 

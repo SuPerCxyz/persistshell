@@ -183,16 +183,19 @@ Client sends validated current terminal/SSH/display context
     ↓
 Daemon validates ownership, retention and connection context
     ↓
+Daemon safely snapshots the bounded tail of rotated Session logs
+    ↓
 Daemon opens a new PTY
     ↓
 Holder starts user shell with saved cwd and allowed startup env snapshot
     ↓
-Daemon replays retained output context
+Daemon sends old history before consuming new Holder output
     ↓
 Live IO forwarding starts
 ```
 
-这不是恢复旧进程，而是恢复旧 Shell 会话的上下文和历史。
+日志缺失、日志关闭或安全校验失败时，Daemon 跳过旧历史但继续恢复 Shell。若新 runtime 创建
+失败，则不发送成功响应或历史。这不是恢复旧进程，而是恢复旧 Shell 会话的上下文和历史。
 
 当前连接上下文只在该次 Closed restore 调用期间存在。Running Session attach 不修改其
 现有环境，connection context 也不写 metadata、最终状态 side channel 或日志。

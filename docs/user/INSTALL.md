@@ -38,25 +38,25 @@ ssh node
 Debian/Ubuntu x86_64：
 
 ```bash
-sudo apt install ./persistshell_0.2.0_amd64.deb
+sudo apt install ./persistshell_0.2.1_amd64.deb
 ```
 
 Debian/Ubuntu ARM64：
 
 ```bash
-sudo apt install ./persistshell_0.2.0_arm64.deb
+sudo apt install ./persistshell_0.2.1_arm64.deb
 ```
 
 RHEL/Rocky/AlmaLinux x86_64：
 
 ```bash
-sudo dnf install ./persistshell-0.2.0-1.x86_64.rpm
+sudo dnf install ./persistshell-0.2.1-1.x86_64.rpm
 ```
 
 RHEL/Rocky/AlmaLinux ARM64：
 
 ```bash
-sudo dnf install ./persistshell-0.2.0-1.aarch64.rpm
+sudo dnf install ./persistshell-0.2.1-1.aarch64.rpm
 ```
 
 正式包要求 glibc 2.28 或更高。已验证 Ubuntu 22.04/24.04/26.04、Debian 11/12/13、

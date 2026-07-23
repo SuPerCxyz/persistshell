@@ -1,5 +1,5 @@
 use std::ffi::{OsStr, OsString};
-use std::io;
+use std::io::{self, Write};
 use std::os::unix::fs::{FileTypeExt, MetadataExt};
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
@@ -118,9 +118,9 @@ pub fn attach(config: &Config, session_id: Option<u32>, readonly: bool) -> Resul
     .is_ok();
 
     if detached_ok {
-        println!("\r\n[detached]");
+        emit_stdout(b"\r\n[detached]\n");
     } else {
-        eprintln!("\r\n[daemon disconnected — session preserved]");
+        emit_stderr(b"\r\n[daemon disconnected - session preserved]\n");
     }
     Ok(())
 }
@@ -202,8 +202,6 @@ fn io_loop(stream: &mut std::os::unix::net::UnixStream) -> Result<()> {
     let stdin_fd = libc::STDIN_FILENO;
 
     let _socket_mode = NonblockingMode::enter(socket_fd)?;
-    let _stdin_mode = NonblockingMode::enter(stdin_fd)?;
-
     let mut accumulator = FrameAccumulator::new();
     let mut buf = vec![0u8; 65536];
 
@@ -247,26 +245,21 @@ fn io_loop(stream: &mut std::os::unix::net::UnixStream) -> Result<()> {
                         match accumulator.try_read() {
                             Ok(Some(frame)) => match frame.msg_type {
                                 MessageType::Stdout => {
-                                    let stdout_fd = libc::STDOUT_FILENO;
-                                    unsafe {
-                                        libc::write(
-                                            stdout_fd,
-                                            frame.payload.as_ptr() as *const libc::c_void,
-                                            frame.payload.len(),
-                                        );
+                                    if !emit_stdout(&frame.payload) {
+                                        return Ok(());
                                     }
                                 }
                                 MessageType::SessionExited => {
                                     return Ok(());
                                 }
                                 MessageType::WriteRequest => {
-                                    eprintln!("\r\n[another client requested write access]");
+                                    emit_stderr(b"\r\n[another client requested write access]\n");
                                 }
                                 MessageType::WriteGranted => {
-                                    eprintln!("\r\n[write access granted]");
+                                    emit_stderr(b"\r\n[write access granted]\n");
                                 }
                                 MessageType::WriteRevoked => {
-                                    eprintln!("\r\n[write access moved to another client]");
+                                    emit_stderr(b"\r\n[write access moved to another client]\n");
                                     return Ok(());
                                 }
                                 MessageType::Detach | MessageType::Close => {
@@ -301,6 +294,9 @@ fn io_loop(stream: &mut std::os::unix::net::UnixStream) -> Result<()> {
                 }
                 Err(_) => break,
             }
+        }
+        if input_is_closed(pfds[1].revents) {
+            break;
         }
 
         if pfds[0].revents & (libc::POLLHUP | libc::POLLERR) != 0 {
@@ -344,13 +340,8 @@ fn io_loop_readonly(stream: &mut std::os::unix::net::UnixStream) -> Result<()> {
                         match accumulator.try_read() {
                             Ok(Some(frame)) => match frame.msg_type {
                                 MessageType::Stdout => {
-                                    let stdout_fd = libc::STDOUT_FILENO;
-                                    unsafe {
-                                        libc::write(
-                                            stdout_fd,
-                                            frame.payload.as_ptr() as *const libc::c_void,
-                                            frame.payload.len(),
-                                        );
+                                    if !emit_stdout(&frame.payload) {
+                                        return Ok(());
                                     }
                                 }
                                 MessageType::SessionExited => {
@@ -417,10 +408,27 @@ fn nix_read(fd: std::os::unix::io::RawFd, buf: &mut [u8]) -> io::Result<usize> {
     }
 }
 
+fn input_is_closed(events: i16) -> bool {
+    events & (libc::POLLHUP | libc::POLLERR | libc::POLLNVAL) != 0
+}
+
+fn write_all_output(writer: &mut impl Write, bytes: &[u8]) -> bool {
+    writer.write_all(bytes).is_ok()
+}
+
+fn emit_stdout(bytes: &[u8]) -> bool {
+    write_all_output(&mut io::stdout().lock(), bytes)
+}
+
+fn emit_stderr(bytes: &[u8]) {
+    let _ = write_all_output(&mut io::stderr().lock(), bytes);
+}
+
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
     use std::fs;
+    use std::io::{self, Write};
     use std::os::unix::ffi::OsStringExt;
     use std::os::unix::fs::symlink;
     use std::os::unix::net::UnixListener;
@@ -428,15 +436,67 @@ mod tests {
     use persist_ipc::{decode_attach, ATTACH_CONTEXT_PROTOCOL_MINOR};
 
     use super::{
-        connection_environment_from_vars, encode_attach_for_server, nix_read,
-        terminal_resize_payload,
+        connection_environment_from_vars, encode_attach_for_server, input_is_closed, nix_read,
+        terminal_resize_payload, write_all_output,
     };
+
+    struct PartialWriter {
+        bytes: Vec<u8>,
+        chunk_size: usize,
+    }
+
+    impl Write for PartialWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            let count = bytes.len().min(self.chunk_size);
+            self.bytes.extend_from_slice(&bytes[..count]);
+            Ok(count)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    struct ClosedWriter;
+
+    impl Write for ClosedWriter {
+        fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "closed"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn zero_terminal_size_is_not_forwarded() {
         assert!(terminal_resize_payload(0, 80).is_none());
         assert!(terminal_resize_payload(24, 0).is_none());
         assert!(terminal_resize_payload(24, 80).is_some());
+    }
+
+    #[test]
+    fn stdout_writer_completes_partial_writes_without_panicking() {
+        let mut writer = PartialWriter {
+            bytes: Vec::new(),
+            chunk_size: 3,
+        };
+        assert!(write_all_output(&mut writer, b"complete-output"));
+        assert_eq!(writer.bytes, b"complete-output");
+    }
+
+    #[test]
+    fn stdout_writer_degrades_on_closed_output() {
+        assert!(!write_all_output(&mut ClosedWriter, b"ignored"));
+    }
+
+    #[test]
+    fn stdin_poll_failure_events_end_attach() {
+        assert!(input_is_closed(libc::POLLHUP));
+        assert!(input_is_closed(libc::POLLERR));
+        assert!(input_is_closed(libc::POLLNVAL));
+        assert!(!input_is_closed(libc::POLLIN));
     }
 
     #[test]

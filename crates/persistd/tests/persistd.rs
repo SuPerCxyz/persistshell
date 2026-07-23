@@ -373,6 +373,17 @@ fn foreground_serves_ipc_and_cleans_up_on_sigterm() {
     )
     .expect("ping attached session");
     read_until_type(client.stream(), MessageType::Pong);
+    write_frame(
+        client.stream(),
+        &Frame {
+            msg_type: MessageType::Stdin,
+            flags: 0,
+            request_id: 12,
+            payload: b"printf 'running-replay-marker\\n'\n".to_vec(),
+        },
+    )
+    .expect("write running replay marker");
+    read_until_stdout_contains(client.stream(), b"running-replay-marker");
     let mut metrics_client = ClientSocket::connect(&socket_path).expect("connect metrics client");
     metrics_client
         .send_hello(unsafe { libc::getuid() }, std::process::id())
@@ -434,6 +445,11 @@ fn foreground_serves_ipc_and_cleans_up_on_sigterm() {
             .expect("decode readonly attach")
             .ok
     );
+    readonly
+        .stream()
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .expect("readonly replay timeout");
+    read_until_stdout_contains(readonly.stream(), b"running-replay-marker");
 
     let mut takeover = ClientSocket::connect(&socket_path).expect("connect takeover client");
     takeover
@@ -479,7 +495,7 @@ fn foreground_serves_ipc_and_cleans_up_on_sigterm() {
             msg_type: MessageType::Stdin,
             flags: 0,
             request_id: 3,
-            payload: b"cd /; sleep 1; exit\n".to_vec(),
+            payload: b"printf 'closed-history-marker\\n'; cd /; sleep 1; exit\n".to_vec(),
         },
     )
     .expect("exit shell");
@@ -548,6 +564,34 @@ fn foreground_serves_ipc_and_cleans_up_on_sigterm() {
         decode_attach_resp(&response.payload)
             .expect("decode closed attach")
             .ok
+    );
+    recovery_client
+        .stream()
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .expect("closed replay timeout");
+    write_frame(
+        recovery_client.stream(),
+        &Frame {
+            msg_type: MessageType::Stdin,
+            flags: 0,
+            request_id: 16,
+            payload: b"printf 'new-runtime-marker\\n'\n".to_vec(),
+        },
+    )
+    .expect("write new runtime marker");
+    let restored_output =
+        read_until_stdout_contains(recovery_client.stream(), b"new-runtime-marker");
+    let old_position = restored_output
+        .windows(b"closed-history-marker".len())
+        .position(|window| window == b"closed-history-marker")
+        .expect("closed history was replayed");
+    let new_position = restored_output
+        .windows(b"new-runtime-marker".len())
+        .position(|window| window == b"new-runtime-marker")
+        .expect("new runtime output was received");
+    assert!(
+        old_position < new_position,
+        "history must precede live output"
     );
     assert_eq!(
         metadata

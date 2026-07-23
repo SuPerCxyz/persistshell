@@ -618,6 +618,36 @@ fn quick_cd_exit_restores_final_cwd() {
 }
 
 #[test]
+fn running_attach_replays_output_after_client_disconnect() {
+    let Some(env) = TestEnv::new() else {
+        return;
+    };
+    let mut daemon = env.start(None);
+    wait_for_socket(&env, &mut daemon);
+    let mut first = connect(&env);
+    let session_id = create_session(&mut first);
+    assert!(attach(&mut first, session_id));
+    send_stdin(
+        &mut first,
+        b"sleep 0.2; printf '__RUNNING_%s__\\n' 'OFFLINE_OUTPUT'\n".to_vec(),
+    );
+    assert!(read_stdout_until(&mut first, b"sleep 0.2"));
+    drop(first);
+    std::thread::sleep(Duration::from_millis(400));
+
+    let mut second = connect(&env);
+    assert!(attach(&mut second, session_id));
+    assert!(read_stdout_until(
+        &mut second,
+        b"__RUNNING_OFFLINE_OUTPUT__"
+    ));
+    send_stdin(&mut second, b"exit\n".to_vec());
+    wait_for_closed(&env, session_id, 0, None);
+    drop(second);
+    stop_daemon(&mut daemon);
+}
+
+#[test]
 fn closed_attach_restores_set_then_persists_unset() {
     let Some(env) = TestEnv::new() else {
         return;
@@ -797,6 +827,13 @@ fn ctrl_d_restores_final_cwd() {
     send_stdin(&mut client, vec![0x15, 0x04]);
     wait_for_closed(&env, session_id, 0, Some(&final_cwd));
     drop(client);
+
+    let mut restored = connect(&env);
+    assert!(attach(&mut restored, session_id));
+    assert!(read_stdout_until(&mut restored, b"__CTRL_D_READY__"));
+    send_stdin(&mut restored, b"exit\n".to_vec());
+    wait_for_closed(&env, session_id, 0, Some(&final_cwd));
+    drop(restored);
     stop_daemon(&mut daemon);
 }
 

@@ -99,8 +99,9 @@ PERSIST_DISABLE=1 ssh node
 ## exit 或 Ctrl+D 后还能回到 Session 吗？
 
 可以。自然退出会释放 shell runtime，但保留 Session metadata、输出、cwd、受限启动环境和
-exit code。之后 `persist attach <id>` 会创建新的可写 PTY；只恢复 `TERM`、`COLORTERM`、
-`LANG` 与 `LC_*`，Shell 运行期间动态 export 的变量不保证恢复。
+exit code。之后 `persist attach <id>` 会先回放退出前最近的有界输出，再创建新的可写 PTY；
+允许恢复的动态 export 变量按 `recovery.environment_include` 和安全禁区策略处理，当前连接变量
+取自本次 attach。已退出的进程不会复活。
 
 cwd 依赖 `/proc` 周期采样。若在一次采样间隔内执行 `cd` 后立即退出，可能保留上一次成功
 采样的目录；正常运行窗口内的 cwd 会随 Closed Session 恢复。

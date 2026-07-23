@@ -287,7 +287,8 @@ max_size = "128MB"
 
 ### replay_on_attach
 
-attach 时是否回放最近输出。
+attach 时是否回放最近输出。启用后，Running Session 使用内存 Ring，Closed Session 使用退出前
+写入的 Session 输出日志；两条路径都只回放有界字节，不解析终端屏幕状态。
 
 ```toml
 replay_on_attach = true
@@ -297,7 +298,7 @@ replay_on_attach = true
 
 ### replay_bytes
 
-默认回放字节数。
+默认回放字节数。默认 512 KiB，同时限制 Running Ring 回放和 Closed 轮转日志尾部读取。
 
 ```toml
 replay_bytes = "512KB"
@@ -309,7 +310,8 @@ replay_bytes = "512KB"
 
 ### session_log
 
-是否记录 Session 输出日志。
+是否记录 Session 输出日志。关闭后不影响 Running Session 的内存 Ring 回放，也不影响 Closed
+Session 恢复 cwd 和允许的环境变量，但 Closed Session 没有退出前输出可供自动回放。
 
 ```toml
 session_log = true
